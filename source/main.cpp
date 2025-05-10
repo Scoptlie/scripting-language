@@ -40,7 +40,8 @@ int main(int argc, char **argv) {
 			p.create(file, bufLen + 1, buf);
 			
 			auto f = p.parseOuterFunc();
-			vm.call(f, 0);
+			vm.push(Val::newFunc(f));
+			vm.call(0);
 		}
 		
 		return 0;

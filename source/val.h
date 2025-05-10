@@ -8,7 +8,7 @@ struct Op;
 
 struct Func {
 	size_t nConsts, nOps,
-		nArgs, nVars;
+		nVars, nParams;
 	Val *consts;
 	Op *ops;
 	

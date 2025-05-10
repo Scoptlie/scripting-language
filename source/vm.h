@@ -65,7 +65,7 @@ struct Vm {
 	void andL();
 	void orL();
 	
-	void call(Func *func, size_t nParams);
+	void call(size_t nArgs);
 	
 	void create();
 	void destroy();

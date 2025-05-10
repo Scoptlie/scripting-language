@@ -45,6 +45,7 @@ public:
 	
 	Token expectToken(Token::Kind kind, char const *kindStr);
 	
+	void pushFunc();
 	size_t pushOp(Op op);
 	int32_t pushConst(Val val);
 	int32_t pushVar(size_t nameLen, char const *name, int32_t idx);
@@ -58,6 +59,8 @@ public:
 	
 	bool parseExpr(size_t minPrecedence = 0);
 	void expectExpr(size_t minPrecedence = 0);
+	
+	size_t parseExprList();
 	
 	bool parseStmt();
 	void expectStmt();
@@ -85,7 +88,7 @@ private:
 	struct FuncBuilder {
 		size_t constsBufLen, nConsts,
 			opsBufLen, nOps,
-			activeVarsBufLen, nActiveVars,
+			activeVarsBufLen, nActiveVars, nParams,
 			scopesBufLen, nScopes,
 			breaksBufLen, nBreaks;
 		
@@ -107,5 +110,8 @@ private:
 	Token nextToken;
 	
 	FuncBuilder fb;
+	
+	size_t fbStackBufLen, fbStackLen;
+	FuncBuilder *fbStack;
 	
 };

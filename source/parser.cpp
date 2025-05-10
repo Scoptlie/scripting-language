@@ -269,6 +269,7 @@ void Parser::FuncBuilder::create() {
 	nOps = 0;
 	activeVarsBufLen = 8;
 	nActiveVars = 0;
+	nParams = 0;
 	scopesBufLen = 8;
 	nScopes = 0;
 	breaksBufLen = 4;
@@ -285,12 +286,14 @@ void Parser::FuncBuilder::create() {
 
 Func *Parser::FuncBuilder::build() {
 	delete[] activeVars;
+	delete[] scopes;
+	delete[] breaks;
 	
 	return new Func{
 		.nConsts = nConsts,
 		.nOps = nOps,
-		.nArgs = 0,
 		.nVars = size_t(nextVarIdx),
+		.nParams = nParams,
 		.consts = consts,
 		.ops = ops
 	};
@@ -317,6 +320,22 @@ Token Parser::expectToken(Token::Kind kind, char const *kindStr) {
 		);
 	}
 	return eatToken();
+}
+
+void Parser::pushFunc() {
+	if (fbStackLen == fbStackBufLen) {
+		fbStackBufLen *= 2;
+		
+		auto newFbStack = new FuncBuilder[fbStackBufLen];
+		memcpy(newFbStack, fbStack, sizeof(FuncBuilder) * fbStackLen);
+		
+		delete[] fbStack;
+		fbStack = newFbStack;
+	}
+	
+	fbStack[fbStackLen++] = fb;
+	
+	fb.create();
 }
 
 size_t Parser::pushOp(Op op) {
@@ -417,6 +436,16 @@ void Parser::pushBreak(size_t opIdx) {
 	fb.breaks[fb.nBreaks++] = opIdx;
 }
 
+
+Func *Parser::popFunc() {
+	assert(fb.nScopes == 0);
+	assert(fb.nBreaks == 0);
+	
+	auto r = fb.build();
+	fb = fbStack[--fbStackLen];
+	return r;
+}
+
 void Parser::popScope() {
 	auto scope = fb.scopes + --fb.nScopes;
 	
@@ -469,6 +498,40 @@ bool Parser::parseExpr(size_t minPrecedence) {
 		pushOp(Op{opcodePushc, n});
 		
 		hasLhs = true;
+	} else if (nextToken.kind == Token::kindKwFunc) {
+		eatToken();
+		
+		pushFunc();
+		
+		expectToken(Token::Kind('('), "'('");
+		
+		while (nextToken.kind == Token::kindName) {
+			pushVar(nextToken.strValLen, nextToken.strVal, 0);
+			eatToken();
+			
+			if (!eatSepToken()) {
+				break;
+			}
+		}
+		
+		expectToken(Token::Kind(')'), "')'");
+		
+		fb.nParams = fb.nActiveVars;
+		for (auto i = size_t(0); i < fb.nActiveVars; i++) {
+			fb.activeVars[i].idx = int32_t(i) - fb.nActiveVars;
+		}
+		
+		expectToken(Token::Kind('{'), "'{'");
+		
+		parseFuncStmtList();
+		
+		expectToken(Token::Kind('}'), "'}'");
+		
+		auto func = popFunc();
+		auto n = pushConst(Val::newFunc(func));
+		pushOp(Op{opcodePushc, n});
+		
+		hasLhs = true;
 	} else if (nextToken.kind == Token::kindName) {
 		int32_t n;
 		if (!findVar(nextToken.strValLen, nextToken.strVal, &n)) {
@@ -484,73 +547,82 @@ bool Parser::parseExpr(size_t minPrecedence) {
 	}
 	
 	for (;;) {
-		auto op = nextToken;
-		
-		size_t precedence;
-		if (hasLhs) {
-			if (op.kind == '*' || op.kind == '/' || op.kind == '%') {
-				precedence = 5;
-			} else if (op.kind == '+' || op.kind == '-') {
-				precedence = 4;
-			} else if (op.kind == Token::kindEq || op.kind == Token::kindNEq ||
-				op.kind == '<' || op.kind == '>' || op.kind == Token::kindLtEq || op.kind == Token::kindGtEq
-			) {
-				precedence = 3;
-			} else if (op.kind == Token::kindAndL) {
-				precedence = 2;
-			} else if (op.kind == Token::kindOrL) {
-				precedence = 1;
-			} else {
-				return true;
-			}
-		} else if (op.kind == '-' || op.kind == '!') {
-			precedence = 6;
+		if (hasLhs && nextToken.kind == Token::Kind('(')) {
+			eatToken();
+			
+			auto n = parseExprList();
+			
+			expectToken(Token::Kind(')'), "')'");
+			
+			pushOp(Op{opcodeCall, int32_t(n)});
 		} else {
-			return false;
-		}
-		
-		if (precedence < minPrecedence) {
-			return hasLhs;
-		}
-		
-		eatToken();
-		
-		expectExpr(precedence);
-		
-		if (hasLhs) {
-			if (op.kind == '*') {
-				pushOp(Op{opcodeMul});
-			} else if (op.kind == '/') {
-				pushOp(Op{opcodeDiv});
-			} else if (op.kind == '%') {
-				pushOp(Op{opcodeMod});
-			} else if (op.kind == '+') {
-				pushOp(Op{opcodeAdd});
-			} else if (op.kind == '-') {
-				pushOp(Op{opcodeSub});
-			} else if (op.kind == Token::kindEq) {
-				pushOp(Op{opcodeCmpEq});
-			} else if (op.kind == Token::kindNEq) {
-				pushOp(Op{opcodeCmpNEq});
-			} else if (op.kind == '<') {
-				pushOp(Op{opcodeCmpLt});
-			} else if (op.kind == '>') {
-				pushOp(Op{opcodeCmpGt});
-			} else if (op.kind == Token::kindLtEq) {
-				pushOp(Op{opcodeCmpLtEq});
-			} else if (op.kind == Token::kindGtEq) {
-				pushOp(Op{opcodeCmpGtEq});
-			} else if (op.kind == Token::kindAndL) {
-				pushOp(Op{opcodeAndL});
-			} else if (op.kind == Token::kindOrL) {
-				pushOp(Op{opcodeOrL});
+			auto op = nextToken;
+			
+			size_t precedence;
+			if (hasLhs) {
+				if (op.kind == '*' || op.kind == '/' || op.kind == '%') {
+					precedence = 5;
+				} else if (op.kind == '+' || op.kind == '-') {
+					precedence = 4;
+				} else if (op.kind == Token::kindEq || op.kind == Token::kindNEq ||
+					op.kind == '<' || op.kind == '>' || op.kind == Token::kindLtEq || op.kind == Token::kindGtEq
+				) {
+					precedence = 3;
+				} else if (op.kind == Token::kindAndL) {
+					precedence = 2;
+				} else if (op.kind == Token::kindOrL) {
+					precedence = 1;
+				} else {
+					return true;
+				}
+			} else if (op.kind == '-' || op.kind == '!') {
+				precedence = 6;
+			} else {
+				return false;
 			}
-		} else if (op.kind == '-') {
-			pushOp(Op{opcodeNeg});
-		} else if (op.kind == '!') {
-			pushOp(Op{opcodeNotL});
+			
+			if (precedence < minPrecedence) {
+				return hasLhs;
+			}
+			
+			eatToken();
+			
+			expectExpr(precedence);
+			
+			if (hasLhs) {
+				if (op.kind == '*') {
+					pushOp(Op{opcodeMul});
+				} else if (op.kind == '/') {
+					pushOp(Op{opcodeDiv});
+				} else if (op.kind == '%') {
+					pushOp(Op{opcodeMod});
+				} else if (op.kind == '+') {
+					pushOp(Op{opcodeAdd});
+				} else if (op.kind == '-') {
+					pushOp(Op{opcodeSub});
+				} else if (op.kind == Token::kindEq) {
+					pushOp(Op{opcodeCmpEq});
+				} else if (op.kind == Token::kindNEq) {
+					pushOp(Op{opcodeCmpNEq});
+				} else if (op.kind == '<') {
+					pushOp(Op{opcodeCmpLt});
+				} else if (op.kind == '>') {
+					pushOp(Op{opcodeCmpGt});
+				} else if (op.kind == Token::kindLtEq) {
+					pushOp(Op{opcodeCmpLtEq});
+				} else if (op.kind == Token::kindGtEq) {
+					pushOp(Op{opcodeCmpGtEq});
+				} else if (op.kind == Token::kindAndL) {
+					pushOp(Op{opcodeAndL});
+				} else if (op.kind == Token::kindOrL) {
+					pushOp(Op{opcodeOrL});
+				}
+			} else if (op.kind == '-') {
+				pushOp(Op{opcodeNeg});
+			} else if (op.kind == '!') {
+				pushOp(Op{opcodeNotL});
+			}
 		}
-		
 		hasLhs = true;
 	}
 }
@@ -561,6 +633,17 @@ void Parser::expectExpr(size_t minPrecedence) {
 			Token::kindAsStr(nextToken.kind)
 		);
 	}
+}
+
+size_t Parser::parseExprList() {
+	auto r = size_t(0);
+	while (parseExpr()) {
+		r++;
+		if (!eatSepToken()) {
+			break;
+		}
+	}
+	return r;
 }
 
 bool Parser::parseStmt() {
@@ -646,22 +729,40 @@ bool Parser::parseStmt() {
 		
 		return true;
 	} else if (nextToken.kind == Token::kindKwBreak) {
-		eatToken();
+		auto found = false;
+		for (auto i = fb.nScopes; i-- > 0;) {
+			auto scope = fb.scopes + i;
+			if (scope->loop) {
+				pushOp(Op{opcodeJmp, 0});
+				pushBreak(fb.nOps - 1);
+				
+				found = true;
+				break;
+			}
+		}
 		
-		pushOp(Op{opcodeJmp, 0});
-		pushBreak(fb.nOps - 1);
+		if (!found) {
+			error(file, nextToken.line, "'break' not within loop");
+		}
+		
+		eatToken();
 		
 		return true;
 	} else if (nextToken.kind == Token::kindKwContinue) {
+		auto found = false;
 		for (auto i = fb.nScopes; i-- > 0;) {
 			auto scope = fb.scopes + i;
 			if (scope->loop) {
 				pushOp(Op{opcodeJmp, int32_t(scope->continueAddr)});
-				goto foundScope;
+				
+				found = true;
+				break;
 			}
 		}
-		error(file, nextToken.line, "'continue' not within loop");
-		foundScope:
+		
+		if (!found) {
+			error(file, nextToken.line, "'continue' not within loop");
+		}
 		
 		eatToken();
 		
@@ -743,4 +844,8 @@ void Parser::create(char const *file, size_t bufLen, char const *buf) {
 	nextToken = lexer.eatToken();
 	
 	fb.create();
+	
+	fbStackBufLen = 8;
+	fbStackLen = 0;
+	fbStack = new FuncBuilder[fbStackBufLen];
 }

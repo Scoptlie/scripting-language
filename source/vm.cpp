@@ -141,17 +141,26 @@ void Vm::orL() {
 	push(Val::fromBool(a.asBool() || b.asBool()));
 }
 
-void Vm::call(Func *func, size_t nParams) {
-	assert(stackLen >= nParams);
+void Vm::call(size_t nArgs) {
+	assert(stackLen >= nArgs + 1);
+	
+	auto funcVal = stack[stackLen - nArgs - 1];
+	if (!funcVal.isFunc()) {
+		stackLen -= nArgs - 1;
+		push(Val::newNil());
+		return;
+	}
+	
+	auto func = funcVal.funcVal;
 	
 	auto consts = func->consts;
 	auto ops = func->ops;
 	
-	if (nParams > func->nArgs) {
-		stackLen -= nParams - func->nArgs;
+	if (nArgs > func->nParams) {
+		stackLen -= nArgs - func->nParams;
 	} else {
-		while (nParams < func->nArgs) {
-			nParams++;
+		while (nArgs < func->nParams) {
+			nArgs++;
 			push(Val::newNil());
 		}
 	}
@@ -255,17 +264,12 @@ void Vm::call(Func *func, size_t nParams) {
 		}
 		case opcodeCall: {
 			assert(op.n >= 0);
-			auto v = stack[stackLen - 1 - op.n];
-			if (v.isFunc()) {
-				call(v.funcVal, op.n);
-			} else {
-				push(Val::newNil());
-			}
+			call(op.n);
 			break;
 		}
 		case opcodeRet: {
 			auto v = pop();
-			stackLen = frameIdx - nParams;
+			stackLen = frameIdx - nArgs - 1;
 			push(v);
 			return;
 		}
@@ -276,7 +280,7 @@ void Vm::call(Func *func, size_t nParams) {
 			} else if (v.isNumber()) {
 				printf("%f\n", v.numberVal);
 			} else if (v.isFunc()) {
-				printf("func.%p\n", v.funcVal);
+				printf("func@%p\n", v.funcVal);
 			}
 			break;
 		}
