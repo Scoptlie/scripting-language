@@ -139,11 +139,10 @@ def gen_bin_file(
 	
 	gen_info_file(info_file, cmd, obj_files)
 
-debug = os.environ.get('DEBUG', '0')
-
-c_compiler = os.environ['C_COMPILER']
-cpp_compiler = os.environ['CPP_COMPILER']
-linker = os.environ['LINKER']
+c_compiler = os.environ.get('C_COMPILER', 'gcc')
+cpp_compiler = os.environ.get('CPP_COMPILER', 'g++')
+linker = os.environ.get('LINKER', cpp_compiler)
+debug = os.environ.get('DEBUG', '0') != '0'
 
 c_compiler_args = []
 cpp_compiler_args = [
@@ -154,7 +153,7 @@ c_cpp_compiler_args = [
 ]
 linker_args = []
 
-if debug == '1':
+if debug:
 	c_cpp_compiler_args += [
 		'-g',
 		'-fsanitize=undefined',
