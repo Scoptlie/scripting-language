@@ -41,33 +41,18 @@ struct Op {
 };
 
 struct Vm {
+	Val call(Func *func, size_t nArgs, Val *args);
+	
+	void create();
+	void destroy();
+	
+private:
 	size_t stackBufLen, stackLen;
 	Val *stack;
 	
 	void push(Val val);
 	Val pop();
 	
-	void neg();
-	void add();
-	void sub();
-	void mul();
-	void div();
-	void mod();
-	
-	void cmpEq();
-	void cmpNEq();
-	void cmpLt();
-	void cmpGt();
-	void cmpLtEq();
-	void cmpGtEq();
-	
-	void notL();
-	void andL();
-	void orL();
-	
 	void call(size_t nArgs);
-	
-	void create();
-	void destroy();
 	
 };

@@ -26,121 +26,6 @@ Val Vm::pop() {
 	return stack[--stackLen];
 }
 
-void Vm::neg() {
-	auto v = pop();
-	if (v.isNumber()) {
-		push(Val::newNumber(-v.numberVal));
-	} else {
-		push(Val::newNil());
-	}  
-}
-
-void Vm::add() {
-	auto b = pop(), a = pop();
-	if (a.isNumber() && b.isNumber()) {
-		push(Val::newNumber(a.numberVal + b.numberVal));
-	} else {
-		push(Val::newNil());
-	}
-}
-
-void Vm::sub() {
-	auto b = pop(), a = pop();
-	if (a.isNumber() && b.isNumber()) {
-		push(Val::newNumber(a.numberVal - b.numberVal));
-	} else {
-		push(Val::newNil());
-	}
-}
-
-void Vm::mul() {
-	auto b = pop(), a = pop();
-	if (a.isNumber() && b.isNumber()) {
-		push(Val::newNumber(a.numberVal * b.numberVal));
-	} else {
-		push(Val::newNil());
-	}
-}
-
-void Vm::div() {
-	auto b = pop(), a = pop();
-	if (a.isNumber() && b.isNumber()) {
-		push(Val::newNumber(a.numberVal / b.numberVal));
-	} else {
-		push(Val::newNil());
-	}
-}
-
-void Vm::mod() {
-	auto b = pop(), a = pop();
-	if (a.isNumber() && b.isNumber()) {
-		push(Val::newNumber(fmod(a.numberVal, b.numberVal)));
-	} else {
-		push(Val::newNil());
-	}
-}
-
-void Vm::cmpEq() {
-	auto b = pop(), a = pop();
-	push(Val::fromBool(a.equals(b)));
-}
-
-void Vm::cmpNEq() {
-	auto b = pop(), a = pop();
-	push(Val::fromBool(!a.equals(b)));
-}
-
-void Vm::cmpLt() {
-	auto b = pop(), a = pop();
-	if (a.isNumber() && b.isNumber()) {
-		push(Val::fromBool(a.numberVal < b.numberVal));
-	} else {
-		push(Val::fromBool(false));
-	}
-}
-
-void Vm::cmpGt() {
-	auto b = pop(), a = pop();
-	if (a.isNumber() && b.isNumber()) {
-		push(Val::fromBool(a.numberVal > b.numberVal));
-	} else {
-		push(Val::fromBool(false));
-	}
-}
-
-void Vm::cmpLtEq() {
-	auto b = pop(), a = pop();
-	if (a.isNumber() && b.isNumber()) {
-		push(Val::fromBool(a.numberVal <= b.numberVal));
-	} else {
-		push(Val::fromBool(false));
-	}
-}
-
-void Vm::cmpGtEq() {
-	auto b = pop(), a = pop();
-	if (a.isNumber() && b.isNumber()) {
-		push(Val::fromBool(a.numberVal >= b.numberVal));
-	} else {
-		push(Val::fromBool(false));
-	}
-}
-
-void Vm::notL() {
-	auto v = pop();
-	push(Val::fromBool(!v.asBool()));
-}
-
-void Vm::andL() {
-	auto b = pop(), a = pop();
-	push(Val::fromBool(a.asBool() && b.asBool()));
-}
-
-void Vm::orL() {
-	auto b = pop(), a = pop();
-	push(Val::fromBool(a.asBool() || b.asBool()));
-}
-
 void Vm::call(size_t nArgs) {
 	assert(stackLen >= nArgs + 1);
 	
@@ -191,64 +76,123 @@ void Vm::call(size_t nArgs) {
 			break;
 		}
 		case opcodeNeg: {
-			neg();
+			auto v = pop();
+			if (v.isNumber()) {
+				push(Val::newNumber(-v.numberVal));
+			} else {
+				push(Val::newNil());
+			}
 			break;
 		}
 		case opcodeAdd: {
-			add();
+			auto b = pop(), a = pop();
+			if (a.isNumber() && b.isNumber()) {
+				push(Val::newNumber(a.numberVal + b.numberVal));
+			} else if (a.isString() || b.isString()) {
+				auto aStr = String::createFromVal(a);
+				auto bStr = String::createFromVal(b);
+				
+				push(Val::newString(aStr->concat(bStr)));
+			} else {
+				push(Val::newNil());
+			}
 			break;
 		}
 		case opcodeSub: {
-			sub();
+			auto b = pop(), a = pop();
+			if (a.isNumber() && b.isNumber()) {
+				push(Val::newNumber(a.numberVal - b.numberVal));
+			} else {
+				push(Val::newNil());
+			}
 			break;
 		}
 		case opcodeMul: {
-			mul();
+			auto b = pop(), a = pop();
+			if (a.isNumber() && b.isNumber()) {
+				push(Val::newNumber(a.numberVal * b.numberVal));
+			} else {
+				push(Val::newNil());
+			}
 			break;
 		}
 		case opcodeDiv: {
-			div();
+			auto b = pop(), a = pop();
+			if (a.isNumber() && b.isNumber()) {
+				push(Val::newNumber(a.numberVal / b.numberVal));
+			} else {
+				push(Val::newNil());
+			}
 			break;
 		}
 		case opcodeMod: {
-			mod();
+			auto b = pop(), a = pop();
+			if (a.isNumber() && b.isNumber()) {
+				push(Val::newNumber(fmod(a.numberVal, b.numberVal)));
+			} else {
+				push(Val::newNil());
+			}
 			break;
 		}
 		case opcodeCmpEq: {
-			cmpEq();
+			auto b = pop(), a = pop();
+			push(Val::fromBool(a.equals(b)));
 			break;
 		}
 		case opcodeCmpNEq: {
-			cmpNEq();
+			auto b = pop(), a = pop();
+			push(Val::fromBool(!a.equals(b)));
 			break;
 		}
 		case opcodeCmpLt: {
-			cmpLt();
+			auto b = pop(), a = pop();
+			if (a.isNumber() && b.isNumber()) {
+				push(Val::fromBool(a.numberVal < b.numberVal));
+			} else {
+				push(Val::fromBool(false));
+			}
 			break;
 		}
 		case opcodeCmpGt: {
-			cmpGt();
+			auto b = pop(), a = pop();
+			if (a.isNumber() && b.isNumber()) {
+				push(Val::fromBool(a.numberVal > b.numberVal));
+			} else {
+				push(Val::fromBool(false));
+			}
 			break;
 		}
 		case opcodeCmpLtEq: {
-			cmpLtEq();
+			auto b = pop(), a = pop();
+			if (a.isNumber() && b.isNumber()) {
+				push(Val::fromBool(a.numberVal <= b.numberVal));
+			} else {
+				push(Val::fromBool(false));
+			}
 			break;
 		}
 		case opcodeCmpGtEq: {
-			cmpGtEq();
-			
+			auto b = pop(), a = pop();
+			if (a.isNumber() && b.isNumber()) {
+				push(Val::fromBool(a.numberVal >= b.numberVal));
+			} else {
+				push(Val::fromBool(false));
+			}
 			break;
 		}
 		case opcodeNotL: {
-			notL();
+			auto v = pop();
+			push(Val::fromBool(!v.asBool()));
 			break;
 		}
 		case opcodeAndL: {
-			andL();
+			auto b = pop(), a = pop();
+			push(Val::fromBool(a.asBool() && b.asBool()));
 			break;
 		}
 		case opcodeOrL: {
-			orL();
+			auto b = pop(), a = pop();
+			push(Val::fromBool(a.asBool() || b.asBool()));
 			break;
 		}
 		case opcodeJmp: {
@@ -278,7 +222,9 @@ void Vm::call(size_t nArgs) {
 			if (v.isNil()) {
 				puts("nil");
 			} else if (v.isNumber()) {
-				printf("%f\n", v.numberVal);
+				printf("%.14g\n", v.numberVal);
+			} else if (v.isString()) {
+				printf("%.*s\n", int(v.stringVal->len), v.stringVal->chars);
 			} else if (v.isFunc()) {
 				printf("func@%p\n", v.funcVal);
 			}
@@ -286,6 +232,16 @@ void Vm::call(size_t nArgs) {
 		}
 		}
 	}
+}
+
+Val Vm::call(Func *func, size_t nArgs, Val *args) {
+	push(Val::newFunc(func));
+	while (nArgs > 0) {
+		push(*args++);
+		nArgs--;
+	}
+	call(nArgs);
+	return pop();
 }
 
 void Vm::create() {

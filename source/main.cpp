@@ -35,14 +35,13 @@ int main(int argc, char **argv) {
 			
 			size_t bufLen;
 			auto buf = loadStr(file, &bufLen);
+			auto f = Parser{}.run(file, bufLen + 1, buf);
+			delete[] buf;
 			
-			auto p = Parser{};
-			p.create(file, bufLen + 1, buf);
-			
-			auto f = p.parseOuterFunc();
-			vm.push(Val::newFunc(f));
-			vm.call(0);
+			vm.call(f, 0, nullptr);
 		}
+		
+		vm.destroy();
 		
 		return 0;
 	}

@@ -7,16 +7,6 @@
 #include "vm.h"
 
 struct Lexer {
-	char nextChar() const;
-	char eatChar();
-	
-	bool eatWhitespace();
-	bool eatComment();
-	void eatPadding();
-	
-	Token eatWordToken();
-	Token eatNumberToken();
-	Token eatSymbolToken();
 	Token eatToken();
 	
 	void create(char const *file, size_t bufLen, char const *buf);
@@ -35,42 +25,23 @@ private:
 	static bool charIsWordStart(char c);
 	static bool charIsWordPart(char c);
 	
+	char nextChar() const;
+	char eatChar();
+	
+	bool eatWhitespace();
+	bool eatComment();
+	void eatPadding();
+	
+	Token eatWordToken();
+	Token eatNumberToken();
+	Token eatStringToken();
+	Token eatSymbolToken();
+	
 };
 
 class Parser {
 public:
-	Token eatToken();
-	
-	bool eatSepToken();
-	
-	Token expectToken(Token::Kind kind, char const *kindStr);
-	
-	void pushFunc();
-	size_t pushOp(Op op);
-	int32_t pushConst(Val val);
-	int32_t pushVar(size_t nameLen, char const *name, int32_t idx);
-	void pushScope(bool loop);
-	void pushBreak(size_t opIdx);
-	
-	Func *popFunc();
-	void popScope();
-	
-	bool findVar(size_t nameLen, char const *name, int32_t *oIdx);
-	
-	bool parseExpr(size_t minPrecedence = 0);
-	void expectExpr(size_t minPrecedence = 0);
-	
-	size_t parseExprList();
-	
-	bool parseStmt();
-	void expectStmt();
-	
-	bool parseStmtList();
-	void parseFuncStmtList();
-	
-	Func *parseOuterFunc();
-	
-	void create(char const *file, size_t bufLen, char const *buf);
+	Func *run(char const *file, size_t bufLen, char const *buf);
 	
 private:
 	struct Var {
@@ -113,5 +84,36 @@ private:
 	
 	size_t fbStackBufLen, fbStackLen;
 	FuncBuilder *fbStack;
+	
+	Token eatToken();
+	
+	bool eatSepToken();
+	
+	Token expectToken(Token::Kind kind, char const *kindStr);
+	
+	void pushFunc();
+	size_t pushOp(Op op);
+	int32_t pushConst(Val val);
+	int32_t pushVar(size_t nameLen, char const *name, int32_t idx);
+	void pushScope(bool loop);
+	void pushBreak(size_t opIdx);
+	
+	Func *popFunc();
+	void popScope();
+	
+	bool findVar(size_t nameLen, char const *name, int32_t *oIdx);
+	
+	bool parseExpr(size_t minPrecedence = 0);
+	void expectExpr(size_t minPrecedence = 0);
+	
+	size_t parseExprList();
+	
+	bool parseStmt();
+	void expectStmt();
+	
+	bool parseStmtList();
+	void parseFuncStmtList();
+	
+	Func *parseOuterFunc();
 	
 };

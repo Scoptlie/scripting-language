@@ -10,6 +10,7 @@ struct Token {
 		kindName,
 		
 		kindNumber,
+		kindString,
 		
 		kindKwNil,
 		kindKwTrue,

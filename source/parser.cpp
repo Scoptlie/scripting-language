@@ -8,6 +8,21 @@
 #include "token.h"
 #include "vm.h"
 
+bool Lexer::charIsDigit(char c) {
+	return c >= '0' && c <= '9';
+}
+
+bool Lexer::charIsWordStart(char c) {
+	return (c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		c == '_';
+}
+
+bool Lexer::charIsWordPart(char c) {
+	return charIsWordStart(c) ||
+		charIsDigit(c);
+}
+
 char Lexer::nextChar() const {
 	assert(it < buf + bufLen);
 	return *it;
@@ -52,21 +67,6 @@ void Lexer::eatPadding() {
 		eatWhitespace() ||
 		eatComment()
 	) { }
-}
-
-bool Lexer::charIsDigit(char c) {
-	return c >= '0' && c <= '9';
-}
-
-bool Lexer::charIsWordStart(char c) {
-	return (c >= 'a' && c <= 'z') ||
-		(c >= 'A' && c <= 'Z') ||
-		c == '_';
-}
-
-bool Lexer::charIsWordPart(char c) {
-	return charIsWordStart(c) ||
-		charIsDigit(c);
 }
 
 Token Lexer::eatWordToken() {
@@ -151,6 +151,64 @@ Token Lexer::eatNumberToken() {
 		.kind = Token::kindNumber,
 		.line = line,
 		.numberVal = val
+	};
+}
+
+Token Lexer::eatStringToken() {
+	eatChar();
+	
+	auto startLine = line;
+	
+	auto charsBufLen = size_t(16);
+	auto nChars = size_t(0);
+	auto chars = new char[charsBufLen];
+	
+	auto eatPossiblyEscapedChar = [&]() {
+		if (nextChar() == '\\') {
+			eatChar();
+			switch (eatChar()) {
+			case '\\': { return '\\'; }
+			case '"': { return '"'; }
+			case 'n': { return '\n'; }
+			case 't': { return '\t'; }
+			case 'r': { return '\r'; }
+			case 'f': { return '\f'; }
+			case 'b': { return '\b'; }
+			case 'e': { return '\x1e'; }
+			default: {
+				error(file, line, "invalid escape sequence in string constant");
+			}
+			}
+		}
+		return eatChar();
+	};
+	
+	while (nextChar() != '"') {
+		if (nChars == charsBufLen) {
+			charsBufLen *= 2;
+			
+			auto newChars = new char[charsBufLen];
+			memcpy(newChars, chars, nChars);
+			
+			delete[] chars;
+			chars = newChars;
+		}
+		
+		chars[nChars++] = eatPossiblyEscapedChar();
+		
+		if (nextChar() == 0) {
+			error(file, startLine, "unclosed string constant");
+		}
+	}
+	
+	eatChar();
+	
+	eolIsWs = false;
+	return Token{
+		.kind = Token::kindString,
+		.line = startLine,
+		.strValLen = nChars,
+		.strVal = chars
 	};
 }
 
@@ -247,6 +305,8 @@ Token Lexer::eatToken() {
 		return eatWordToken();
 	} else if (charIsDigit(c)) {
 		return eatNumberToken();
+	} else if (c == '"') {
+		return eatStringToken();
 	}
 	return eatSymbolToken();
 }
@@ -494,6 +554,15 @@ bool Parser::parseExpr(size_t minPrecedence) {
 	} else if (nextToken.kind == Token::kindNumber) {
 		auto n = pushConst(Val::newNumber(nextToken.numberVal));
 		eatToken();
+		
+		pushOp(Op{opcodePushc, n});
+		
+		hasLhs = true;
+	} else if (nextToken.kind == Token::kindString) {
+		auto val = String::create(nextToken.strValLen, nextToken.strVal);
+		eatToken();
+		
+		auto n = pushConst(Val::newString(val));
 		
 		pushOp(Op{opcodePushc, n});
 		
@@ -827,17 +896,7 @@ void Parser::parseFuncStmtList() {
 	}
 }
 
-Func *Parser::parseOuterFunc() {
-	pushScope(false);
-	parseFuncStmtList();
-	popScope();
-	
-	expectToken(Token::kindEof, "end of file");
-	
-	return fb.build();
-}
-
-void Parser::create(char const *file, size_t bufLen, char const *buf) {
+Func *Parser::run(char const *file, size_t bufLen, char const *buf) {
 	this->file = file;
 	
 	lexer.create(file, bufLen, buf);
@@ -848,4 +907,16 @@ void Parser::create(char const *file, size_t bufLen, char const *buf) {
 	fbStackBufLen = 8;
 	fbStackLen = 0;
 	fbStack = new FuncBuilder[fbStackBufLen];
+	
+	pushScope(false);
+	parseFuncStmtList();
+	popScope();
+	
+	expectToken(Token::kindEof, "end of file");
+	
+	auto r = fb.build();
+	
+	delete[] fbStack;
+	
+	return r;
 }
