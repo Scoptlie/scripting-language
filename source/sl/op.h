@@ -2,9 +2,7 @@
 
 #include <cstdint>
 
-#include "val.h"
-
-enum Opcode {
+enum Opcode : uint8_t {
 	opcodePushc,
 	opcodePush,
 	opcodePop,
@@ -27,32 +25,15 @@ enum Opcode {
 	opcodeAndL,
 	opcodeOrL,
 	
+	opcodePrint,
+	
 	opcodeJmp,
 	opcodeJmpN,
 	
 	opcodeCall,
 	opcodeRet,
-	
-	opcodePrint,
 };
 
 struct Op {
-	int32_t opcode: 8, n: 24;
-};
-
-struct Vm {
-	Val call(Func *func, size_t nArgs, Val *args);
-	
-	void create();
-	void destroy();
-	
-private:
-	size_t stackBufLen, stackLen;
-	Val *stack;
-	
-	void push(Val val);
-	Val pop();
-	
-	void call(size_t nArgs);
-	
+	int32_t opcode: 8, arg: 24;
 };

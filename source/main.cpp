@@ -1,48 +1,47 @@
 
-#include <cassert>
-#include <cstdio>
 #include <cstring>
 
-#include "parser.h"
-
-char *loadStr(char const *file, size_t *oLen) {
-	auto s = fopen(file, "rb");
-	assert(s);
-	
-	fseek(s, 0, SEEK_END);
-	auto len = ftell(s);
-	
-	auto r = new char[len + 1];
-	fseek(s, 0, SEEK_SET);
-	fread(r, 1, len, s);
-	r[len] = 0;
-	
-	*oLen = len;
-	return r;
-}
+#include "sl/heap.h"
+#include "sl/thread.h"
 
 int main(int argc, char **argv) {
-	if (argc == 1) {
-		puts("no inputs");
-		
-		return 1;
-	} else {
-		auto vm = Vm{};
-		vm.create();
-		
-		for (auto i = 1; i < argc; i++) {
-			auto file = argv[i];
-			
-			size_t bufLen;
-			auto buf = loadStr(file, &bufLen);
-			auto f = Parser{}.run(file, bufLen + 1, buf);
-			delete[] buf;
-			
-			vm.call(f, 0, nullptr);
-		}
-		
-		vm.destroy();
-		
-		return 0;
-	}
+	using namespace SL;
+	
+	Heap heap;
+	heap.init();
+	
+	auto func = Func::create(&heap);
+	func->nConsts = 4;
+	func->consts = new Val[] {
+		Val::newNumber(0.0),
+		Val::newNumber(1.0),
+		Val::newNumber(10.0),
+		Val::newNil()
+	};
+	func->nOps = 13;
+	func->ops = new Op[] {
+		Op{opcodePushc, 0},
+		Op{opcodePop, 0},
+			Op{opcodePush, 0},
+			Op{opcodePrint},
+			Op{opcodePush, 0},
+			Op{opcodePushc, 1},
+			Op{opcodeAdd},
+			Op{opcodePop, 0},
+			Op{opcodePush, 0},
+			Op{opcodePushc, 2},
+			Op{opcodeCmpGtEq},
+			Op{opcodeJmpN, 2},
+		Op{opcodePushc, 3},
+		Op{opcodeRet}
+	};
+	func->nParams = 0;
+	func->nVars = 1;
+	
+	auto thread = Thread::create(&heap);
+	
+	Val result;
+	thread->call(func, 0, nullptr, &result);
+	
+	heap.deinit();
 }
