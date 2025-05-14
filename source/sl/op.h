@@ -2,38 +2,40 @@
 
 #include <cstdint>
 
-enum Opcode : uint8_t {
-	opcodePushc,
-	opcodePush,
-	opcodePop,
+namespace SL {
+	enum Opcode : uint8_t {
+		opcodePushc,
+		opcodePush,
+		opcodePop,
+		
+		opcodeNeg,
+		opcodeAdd,
+		opcodeSub,
+		opcodeMul,
+		opcodeDiv,
+		opcodeMod,
+		
+		opcodeCmpEq,
+		opcodeCmpNEq,
+		opcodeCmpLt,
+		opcodeCmpGt,
+		opcodeCmpLtEq,
+		opcodeCmpGtEq,
+		
+		opcodeNotL,
+		opcodeAndL,
+		opcodeOrL,
+		
+		opcodePrint,
+		
+		opcodeJmp,
+		opcodeJmpN,
+		
+		opcodeCall,
+		opcodeRet,
+	};
 	
-	opcodeNeg,
-	opcodeAdd,
-	opcodeSub,
-	opcodeMul,
-	opcodeDiv,
-	opcodeMod,
-	
-	opcodeCmpEq,
-	opcodeCmpNEq,
-	opcodeCmpLt,
-	opcodeCmpGt,
-	opcodeCmpLtEq,
-	opcodeCmpGtEq,
-	
-	opcodeNotL,
-	opcodeAndL,
-	opcodeOrL,
-	
-	opcodePrint,
-	
-	opcodeJmp,
-	opcodeJmpN,
-	
-	opcodeCall,
-	opcodeRet,
-};
-
-struct Op {
-	int32_t opcode: 8, arg: 24;
-};
+	struct Op {
+		int32_t opcode: 8, arg: 24;
+	};
+}

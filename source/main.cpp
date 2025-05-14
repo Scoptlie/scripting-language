@@ -10,33 +10,50 @@ int main(int argc, char **argv) {
 	Heap heap;
 	heap.init();
 	
-	auto func = Func::create(&heap);
-	func->nConsts = 4;
-	func->consts = new Val[] {
-		Val::newNumber(0.0),
+	auto factorial = Func::create(&heap);
+	factorial->nConsts = 2;
+	factorial->consts = new Val[] {
 		Val::newNumber(1.0),
-		Val::newNumber(10.0),
+		Val::newFunc(factorial),
+	};
+	factorial->nOps = 14;
+	factorial->ops = new Op[] {
+		Op{opcodePush, -1},
+		Op{opcodePushc, 0},
+		Op{opcodeCmpLtEq},
+		Op{opcodeJmpN, 6},
+			Op{opcodePushc, 0},
+			Op{opcodeRet},
+		Op{opcodePushc, 1},
+		Op{opcodePush, -1},
+		Op{opcodePushc, 0},
+		Op{opcodeSub},
+		Op{opcodeCall, 1},
+		Op{opcodePush, -1},
+		Op{opcodeMul},
+		Op{opcodeRet},
+	};
+	factorial->nParams = 1;
+	factorial->nVars = 0;
+	
+	auto func = Func::create(&heap);
+	func->nConsts = 3;
+	func->consts = new Val[] {
+		Val::newFunc(factorial),
+		Val::newNumber(12.0),
 		Val::newNil()
 	};
-	func->nOps = 13;
+	func->nOps = 6;
 	func->ops = new Op[] {
 		Op{opcodePushc, 0},
-		Op{opcodePop, 0},
-			Op{opcodePush, 0},
-			Op{opcodePrint},
-			Op{opcodePush, 0},
-			Op{opcodePushc, 1},
-			Op{opcodeAdd},
-			Op{opcodePop, 0},
-			Op{opcodePush, 0},
-			Op{opcodePushc, 2},
-			Op{opcodeCmpGtEq},
-			Op{opcodeJmpN, 2},
-		Op{opcodePushc, 3},
-		Op{opcodeRet}
+		Op{opcodePushc, 1},
+		Op{opcodeCall, 1},
+		Op{opcodePrint},
+		Op{opcodePushc, 2},
+		Op{opcodeRet},
 	};
 	func->nParams = 0;
-	func->nVars = 1;
+	func->nVars = 0;
 	
 	auto thread = Thread::create(&heap);
 	

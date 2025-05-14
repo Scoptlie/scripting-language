@@ -90,6 +90,16 @@ namespace SL {
 				auto b = stack.pop(), a = stack.pop();
 				if (a.isNumber() && b.isNumber()) {
 					stack.push(Val::newNumber(a.numberVal + b.numberVal));
+				} else if (a.isString() || b.isString()) {
+					auto aStr = String::createFromVal(heap, a);
+					auto bStr = String::createFromVal(heap, b);
+					
+					auto len = aStr->nChars + bStr->nChars;
+					auto r = String::create(heap, len);
+					memcpy(r->chars, aStr->chars, aStr->nChars);
+					memcpy(r->chars + aStr->nChars, bStr->chars, bStr->nChars);
+					
+					stack.push(Val::newString(r));
 				} else {
 					stack.push(Val::newNil());
 				}

@@ -16,10 +16,10 @@ namespace SL {
 				bufLen *= 2;
 				
 				auto newBuf = new T[bufLen];
-				memcpy(newBuf, buf, len);
+				memcpy(newBuf, buf, sizeof(T) * len);
 				
 				delete[] buf;
-				newBuf = buf;
+				buf = newBuf;
 			}
 			
 			buf[len++] = elem;
