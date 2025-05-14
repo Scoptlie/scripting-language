@@ -1,0 +1,15 @@
+
+var _a = 0
+var b_2 = 1a
+
+print "fibonacci sequence:"
+
+var i = 0, while i < 10 {
+	print b
+	
+	var c = a + b
+	a = b
+	b = c
+	
+	i = i + 1
+}

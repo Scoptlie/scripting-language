@@ -1,0 +1,9 @@
+
+*
+!*/
+
+!source/**
+!.gitignore
+!build.py
+!README.md
+!test.scr

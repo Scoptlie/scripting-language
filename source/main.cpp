@@ -1,8 +1,26 @@
 
-#include <cstring>
+#include <cassert>
+#include <cstddef>
+#include <cstdio>
 
 #include "sl/heap.h"
-#include "sl/thread.h"
+#include "sl/compiler.h"
+
+char *loadString(char const *file, size_t *oNChars) {
+	auto s = fopen(file, "rb");
+	assert(s);
+	
+	fseek(s, 0, SEEK_END);
+	auto nChars = ftell(s);
+	
+	auto chars = new char[nChars + 1];
+	fseek(s, 0, SEEK_SET);
+	fread(chars, 1, nChars, s);
+	chars[nChars] = 0;
+	
+	*oNChars = nChars;
+	return chars;
+}
 
 int main(int argc, char **argv) {
 	using namespace SL;
@@ -10,55 +28,28 @@ int main(int argc, char **argv) {
 	Heap heap;
 	heap.init();
 	
-	auto factorial = Func::create(&heap);
-	factorial->nConsts = 2;
-	factorial->consts = new Val[] {
-		Val::newNumber(1.0),
-		Val::newFunc(factorial),
-	};
-	factorial->nOps = 14;
-	factorial->ops = new Op[] {
-		Op{opcodePush, -1},
-		Op{opcodePushc, 0},
-		Op{opcodeCmpLtEq},
-		Op{opcodeJmpN, 6},
-			Op{opcodePushc, 0},
-			Op{opcodeRet},
-		Op{opcodePushc, 1},
-		Op{opcodePush, -1},
-		Op{opcodePushc, 0},
-		Op{opcodeSub},
-		Op{opcodeCall, 1},
-		Op{opcodePush, -1},
-		Op{opcodeMul},
-		Op{opcodeRet},
-	};
-	factorial->nParams = 1;
-	factorial->nVars = 0;
+	auto file = "test.scr";
 	
-	auto func = Func::create(&heap);
-	func->nConsts = 3;
-	func->consts = new Val[] {
-		Val::newFunc(factorial),
-		Val::newNumber(12.0),
-		Val::newNil()
-	};
-	func->nOps = 6;
-	func->ops = new Op[] {
-		Op{opcodePushc, 0},
-		Op{opcodePushc, 1},
-		Op{opcodeCall, 1},
-		Op{opcodePrint},
-		Op{opcodePushc, 2},
-		Op{opcodeRet},
-	};
-	func->nParams = 0;
-	func->nVars = 0;
+	size_t nChars;
+	auto chars = loadString(file, &nChars);
 	
-	auto thread = Thread::create(&heap);
-	
-	Val result;
-	thread->call(func, 0, nullptr, &result);
+	try {
+		Lexer lexer;
+		lexer.init(file, nChars + 1, chars);
+		
+		Token t;
+		do {
+			t = lexer.eatToken();
+			printf("%-3d %-16s", int(t.line), t.desc());
+			if (t.kind == tokenKindNumber) {
+				printf("%.14g\n", t.numberVal);
+			} else if (t.kind == tokenKindName || t.kind == tokenKindString) {
+				printf("\"%.*s\"\n", int(t.strVal.nChars), t.strVal.chars);
+			} else {
+				puts("");
+			}
+		} while (t.kind != tokenKindEof);
+	} catch (...) { }
 	
 	heap.deinit();
 }
