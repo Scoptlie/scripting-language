@@ -98,6 +98,7 @@ namespace SL {
 		void expectStmt();
 		
 		size_t eatStmtList();
+		void eatFuncStmtList();
 		
 	};
 }

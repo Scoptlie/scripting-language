@@ -466,6 +466,70 @@ namespace SL {
 			ops.push(Op{opcodeConst, int32_t(arg)});
 			
 			hasLhs = true;
+		} else if (nextToken.kind == tokenKindKwFunc) {
+			eatToken();
+			
+			auto prevConsts = consts;
+			auto prevOps = ops;
+			auto prevNParams = nParams;
+			auto prevNVars = nVars;
+			auto prevActiveLocals = activeLocals;
+			auto prevScopes = scopes;
+			
+			consts.init(8);
+			ops.init(32);
+			nParams = 0;
+			nVars = 0;
+			activeLocals.init(8);
+			prevScopes.init(8);
+			
+			expectToken(TokenKind('('), "'('");
+			
+			while (nextToken.kind == tokenKindName) {
+				activeLocals.push(Local{
+					.idx = 0,
+					.name = {nextToken.strVal.nChars, nextToken.strVal.chars},
+				});
+				eatToken();
+				
+				if (!eatSepToken()) {
+					break;
+				}
+			}
+			
+			expectToken(TokenKind(')'), "')'");
+			
+			nParams = activeLocals.len;
+			
+			for (auto i = size_t(0); i < activeLocals.len; i++) {
+				activeLocals.buf[i].idx = int32_t(i) - int32_t(activeLocals.len);
+			}
+			
+			expectToken(TokenKind('{'), "");
+			
+			eatFuncStmtList();
+			
+			expectToken(TokenKind('}'), "");
+			
+			auto func = Func::create(heap);
+			func->nConsts = consts.len;
+			func->consts = consts.buf;
+			func->nOps = ops.len;
+			func->ops = ops.buf;
+			func->nParams = nParams;
+			func->nVars = nVars;
+			
+			scopes = prevScopes;
+			activeLocals = prevActiveLocals;
+			nVars = prevNVars;
+			nParams = prevNParams;
+			ops = prevOps;
+			consts = prevConsts;
+			
+			auto arg = getConst(Val::newFunc(func));
+			ops.push(Op{opcodeConst, int32_t(arg)});
+			
+			hasLhs = true;
 		} else if (nextToken.kind == tokenKindName) {
 			int32_t idx;
 			if (getLocal(nextToken.strVal.nChars, nextToken.strVal.chars, &idx)) {
@@ -484,75 +548,85 @@ namespace SL {
 		}
 		
 		for (;;) {
-			auto op = nextToken.kind;
-			
-			size_t precedence;
-			if (hasLhs) {
-				if (op == '*' || op == '/' || op == '%') {
-					precedence = 5;
-				} else if (op == '+' || op == '-') {
-					precedence = 4;
-				} else if (op == tokenKindEq || op == tokenKindNEq ||
-					op == '<' || op == '>' || op == tokenKindLtEq || op == tokenKindGtEq
-				) {
-					precedence = 3;
-				} else if (op == tokenKindAndL) {
-					precedence = 2;
-				} else if (op == tokenKindOrL) {
-					precedence = 1;
-				} else {
-					return true;
-				}
-			} else if (op == '-' || op == '!') {
-				precedence = 6;
+			if (nextToken.kind == '(') {
+				eatToken();
+				
+				auto nArgs = eatExprList();
+				
+				expectToken(TokenKind(')'), "')'");
+				
+				ops.push(Op{opcodeCall, int32_t(nArgs)});
 			} else {
-				return false;
-			}
-			
-			if (precedence < minPrecedence) {
-				return hasLhs;
-			}
-			
-			eatToken();
-			
-			expectExpr(precedence);
-			
-			if (hasLhs) {
-				if (op == '*') {
-					ops.push(Op{opcodeMul});
-				} else if (op == '/') {
-					ops.push(Op{opcodeDiv});
-				} else if (op == '%') {
-					ops.push(Op{opcodeMod});
-				} else if (op == '+') {
-					ops.push(Op{opcodeAdd});
+				auto op = nextToken.kind;
+				
+				size_t precedence;
+				if (hasLhs) {
+					if (op == '*' || op == '/' || op == '%') {
+						precedence = 5;
+					} else if (op == '+' || op == '-') {
+						precedence = 4;
+					} else if (op == tokenKindEq || op == tokenKindNEq ||
+						op == '<' || op == '>' || op == tokenKindLtEq || op == tokenKindGtEq
+					) {
+						precedence = 3;
+					} else if (op == tokenKindAndL) {
+						precedence = 2;
+					} else if (op == tokenKindOrL) {
+						precedence = 1;
+					} else {
+						return true;
+					}
+				} else if (op == '-' || op == '!') {
+					precedence = 6;
+				} else {
+					return false;
+				}
+				
+				if (precedence < minPrecedence) {
+					return hasLhs;
+				}
+				
+				eatToken();
+				
+				expectExpr(precedence);
+				
+				if (hasLhs) {
+					if (op == '*') {
+						ops.push(Op{opcodeMul});
+					} else if (op == '/') {
+						ops.push(Op{opcodeDiv});
+					} else if (op == '%') {
+						ops.push(Op{opcodeMod});
+					} else if (op == '+') {
+						ops.push(Op{opcodeAdd});
+					} else if (op == '-') {
+						ops.push(Op{opcodeSub});
+					} else if (op == tokenKindEq) {
+						ops.push(Op{opcodeCmpEq});
+					} else if (op == tokenKindNEq) {
+						ops.push(Op{opcodeCmpNEq});
+					} else if (op == '<') {
+						ops.push(Op{opcodeCmpLt});
+					} else if (op == '>') {
+						ops.push(Op{opcodeCmpGt});
+					} else if (op == tokenKindLtEq) {
+						ops.push(Op{opcodeCmpLtEq});
+					} else if (op == tokenKindGtEq) {
+						ops.push(Op{opcodeCmpGtEq});
+					} else if (op == tokenKindAndL) {
+						ops.push(Op{opcodeAndL});
+					} else if (op == tokenKindOrL) {
+						ops.push(Op{opcodeOrL});
+					} else {
+						assert(!"unreachable");
+					}
 				} else if (op == '-') {
-					ops.push(Op{opcodeSub});
-				} else if (op == tokenKindEq) {
-					ops.push(Op{opcodeCmpEq});
-				} else if (op == tokenKindNEq) {
-					ops.push(Op{opcodeCmpNEq});
-				} else if (op == '<') {
-					ops.push(Op{opcodeCmpLt});
-				} else if (op == '>') {
-					ops.push(Op{opcodeCmpGt});
-				} else if (op == tokenKindLtEq) {
-					ops.push(Op{opcodeCmpLtEq});
-				} else if (op == tokenKindGtEq) {
-					ops.push(Op{opcodeCmpGtEq});
-				} else if (op == tokenKindAndL) {
-					ops.push(Op{opcodeAndL});
-				} else if (op == tokenKindOrL) {
-					ops.push(Op{opcodeOrL});
+					ops.push(Op{opcodeNeg});
+				} else if (op == '!') {
+					ops.push(Op{opcodeNotL});
 				} else {
 					assert(!"unreachable");
 				}
-			} else if (op == '-') {
-				ops.push(Op{opcodeNeg});
-			} else if (op == '!') {
-				ops.push(Op{opcodeNotL});
-			} else {
-				assert(!"unreachable");
 			}
 			
 			hasLhs = true;
@@ -763,6 +837,16 @@ namespace SL {
 		return r;
 	}
 	
+	void Compiler::eatFuncStmtList() {
+		eatStmtList();
+		
+		if (ops.len == 0 || ops.buf[ops.len - 1].opcode != opcodeRet) {
+			auto arg = getConst(Val::newNil());
+			ops.push(Op{opcodeConst, int32_t(arg)});
+			ops.push(Op{opcodeRet});
+		}
+	}
+	
 	Func *Compiler::run(Heap *heap, char const *file, size_t nChars, char const *chars) {
 		this->heap = heap;
 		
@@ -780,13 +864,7 @@ namespace SL {
 		breakOps.init(8);
 		
 		try {
-			eatStmtList();
-			
-			if (ops.len == 0 || ops.buf[ops.len - 1].opcode != opcodeRet) {
-				auto arg = getConst(Val::newNil());
-				ops.push(Op{opcodeConst, int32_t(arg)});
-				ops.push(Op{opcodeRet});
-			}
+			eatFuncStmtList();
 			
 			expectToken(tokenKindEof, "end of file");
 			
