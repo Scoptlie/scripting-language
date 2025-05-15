@@ -326,12 +326,21 @@ namespace SL {
 	
 	void Compiler::enterScope(bool isLoop) {
 		scopes.push(Scope{
-			.firstActiveLocal = activeLocals.len
+			.firstOp = ops.len,
+			.firstActiveLocal = activeLocals.len,
+			.isLoop = isLoop,
 		});
 	}
 	
 	void Compiler::exitScope() {
 		auto s = scopes.pop();
+		
+		if (s.isLoop) {
+			for (auto i = size_t(0); i < breakOps.len; i++) {
+				ops.buf[breakOps.buf[i]].arg = int32_t(ops.len);
+			}
+			breakOps.len = 0;
+		}
 		
 		// Pop locals defined within this scope
 		activeLocals.len = s.firstActiveLocal;
@@ -608,12 +617,14 @@ namespace SL {
 			
 			return true;
 		} else if (nextToken.kind == tokenKindKwIf) {
+			enterScope();
+			
 			eatToken();
 			
 			expectExpr();
 			
 			auto jmpElseOp = ops.len;
-			ops.push(Op{opcodeJmpN, 0});
+			ops.push(Op{opcodeJmpN, -1});
 			
 			expectStmt();
 			
@@ -621,7 +632,7 @@ namespace SL {
 				eatToken();
 				
 				auto jmpEndOp = ops.len;
-				ops.push(Op{opcodeJmp, 0});
+				ops.push(Op{opcodeJmp, -1});
 				
 				ops.buf[jmpElseOp].arg = ops.len;
 				
@@ -632,8 +643,12 @@ namespace SL {
 				ops.buf[jmpElseOp].arg = ops.len;
 			}
 			
+			exitScope();
+			
 			return true;
 		} else if (nextToken.kind == tokenKindKwWhile) {
+			enterScope(true);
+			
 			eatToken();
 			
 			auto start = int32_t(ops.len);
@@ -641,13 +656,55 @@ namespace SL {
 			eatExpr();
 			
 			auto jmpEndOp = ops.len;
-			ops.push(Op{opcodeJmpN, 0});
+			ops.push(Op{opcodeJmpN, -1});
 			
 			eatStmt();
 			
 			ops.push(Op{opcodeJmp, start});
 			
 			ops.buf[jmpEndOp].arg = int32_t(ops.len);
+			
+			exitScope();
+			
+			return true;
+		} else if (nextToken.kind == tokenKindKwBreak) {
+			auto inLoop = false;
+			for (auto i = scopes.len; i-- > 0;) {
+				auto s = &scopes.buf[i];
+				if (s->isLoop) {
+					inLoop = true;
+					break;
+				}
+			}
+			
+			if (!inLoop) {
+				printError(file, nextToken.line, "'break' not within loop");
+				throw 0;
+			}
+			
+			eatToken();
+			
+			breakOps.push(ops.len);
+			ops.push(Op{opcodeJmp, -1});
+			
+			return true;
+		} else if (nextToken.kind == tokenKindKwContinue) {
+			auto inLoop = false;
+			for (auto i = scopes.len; i-- > 0;) {
+				auto s = &scopes.buf[i];
+				if (s->isLoop) {
+					ops.push(Op{opcodeJmp, int32_t(s->firstOp)});
+					inLoop = true;
+					break;
+				}
+			}
+			
+			if (!inLoop) {
+				printError(file, nextToken.line, "'continue' not within loop");
+				throw 0;
+			}
+			
+			eatToken();
 			
 			return true;
 		} else if (nextToken.kind == tokenKindKwReturn) {
@@ -720,27 +777,42 @@ namespace SL {
 		nVars = 0;
 		activeLocals.init(8);
 		scopes.init(8);
+		breakOps.init(8);
 		
-		eatStmtList();
-		
-		expectToken(tokenKindEof, "end of file");
-		
-		if (ops.buf[ops.len - 1].opcode != opcodeRet) {
-			auto arg = getConst(Val::newNil());
-			ops.push(Op{opcodeConst, int32_t(arg)});
-			ops.push(Op{opcodeRet});
+		try {
+			eatStmtList();
+			
+			if (ops.len == 0 || ops.buf[ops.len - 1].opcode != opcodeRet) {
+				auto arg = getConst(Val::newNil());
+				ops.push(Op{opcodeConst, int32_t(arg)});
+				ops.push(Op{opcodeRet});
+			}
+			
+			expectToken(tokenKindEof, "end of file");
+			
+			auto r = Func::create(heap);
+			r->nConsts = consts.len;
+			r->consts = consts.buf;
+			r->nOps = ops.len;
+			r->ops = ops.buf;
+			r->nParams = nParams;
+			r->nVars = nVars;
+			
+			breakOps.deinit();
+			scopes.deinit();
+			activeLocals.deinit();
+			lexer.deinit();
+			
+			return r;
+		} catch (...) {
+			breakOps.deinit();
+			scopes.deinit();
+			activeLocals.deinit();
+			ops.deinit();
+			consts.deinit();
+			lexer.deinit();
+			
+			return nullptr;
 		}
-		
-		lexer.deinit();
-		
-		auto r = Func::create(heap);
-		r->nConsts = consts.len;
-		r->consts = consts.buf;
-		r->nOps = ops.len;
-		r->ops = ops.buf;
-		r->nParams = nParams;
-		r->nVars = nVars;
-		
-		return r;
 	}
 }

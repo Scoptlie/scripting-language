@@ -59,7 +59,9 @@ namespace SL {
 		
 		// Record of a lexical scope
 		struct Scope {
+			size_t firstOp;
 			size_t firstActiveLocal;
+			bool isLoop;
 		};
 		
 		Heap *heap;
@@ -74,6 +76,7 @@ namespace SL {
 		size_t nParams, nVars;
 		DArray<Local> activeLocals;
 		DArray<Scope> scopes;
+		DArray<size_t> breakOps;
 		
 		size_t getConst(Val val);
 		int32_t createVar(size_t nameNChars, char const *nameChars);
