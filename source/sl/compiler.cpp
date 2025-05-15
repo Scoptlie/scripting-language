@@ -303,16 +303,16 @@ namespace SL {
 	
 	size_t Compiler::createVar(size_t nameNChars, char const *nameChars) {
 		nVars++;
-		activeVars.push(ActiveVar{
+		activeLocals.push(ActiveLocal{
 			.idx = nVars - 1,
 			.name = {nameNChars, nameChars}
 		});
 		return nVars - 1;
 	}
 	
-	bool Compiler::getVar(size_t nameNChars, char const *nameChars, size_t *oIdx) {
-		for (auto i = activeVars.len; i-- > 0;) {
-			auto v = &activeVars.buf[i];
+	bool Compiler::getLocal(size_t nameNChars, char const *nameChars, size_t *oIdx) {
+		for (auto i = activeLocals.len; i-- > 0;) {
+			auto v = &activeLocals.buf[i];
 			if (nameNChars == v->name.nChars &&
 				memcmp(nameChars, v->name.chars, nameNChars) == 0
 			) {
@@ -445,7 +445,7 @@ namespace SL {
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindName) {
 			size_t idx;
-			if (getVar(nextToken.strVal.nChars, nextToken.strVal.chars, &idx)) {
+			if (getLocal(nextToken.strVal.nChars, nextToken.strVal.chars, &idx)) {
 				ops.push(Op{opcodeVar, int32_t(idx)});
 			} else {
 				printError(file, nextToken.line, "unresolved name '%.*s'",
@@ -615,6 +615,23 @@ namespace SL {
 			}
 			
 			return true;
+		} else if (nextToken.kind == tokenKindKwWhile) {
+			eatToken();
+			
+			auto start = int32_t(ops.len);
+			
+			eatExpr();
+			
+			auto jmpEndOp = ops.len;
+			ops.push(Op{opcodeJmpN, 0});
+			
+			eatStmt();
+			
+			ops.push(Op{opcodeJmp, start});
+			
+			ops.buf[jmpEndOp].arg = int32_t(ops.len);
+			
+			return true;
 		} else if (nextToken.kind == tokenKindKwReturn) {
 			eatToken();
 			
@@ -683,7 +700,7 @@ namespace SL {
 		ops.init(32);
 		nParams = 0;
 		nVars = 0;
-		activeVars.init(8);
+		activeLocals.init(8);
 		
 		eatStmtList();
 		

@@ -46,7 +46,7 @@ namespace SL {
 		Func *run(Heap *heap, char const *file, size_t nChars, char const *chars);
 		
 	private:
-		struct ActiveVar {
+		struct ActiveLocal {
 			size_t idx;
 			struct {
 				size_t nChars;
@@ -64,11 +64,11 @@ namespace SL {
 		DArray<Val> consts;
 		DArray<Op> ops;
 		size_t nParams, nVars;
-		DArray<ActiveVar> activeVars;
+		DArray<ActiveLocal> activeLocals;
 		
 		size_t getConst(Val val);
 		size_t createVar(size_t nameNChars, char const *nameChars);
-		bool getVar(size_t nameNChars, char const *nameChars, size_t *oIdx);
+		bool getLocal(size_t nameNChars, char const *nameChars, size_t *oIdx);
 		
 		Token eatToken();
 		Token expectToken(TokenKind kind, char const *desc);

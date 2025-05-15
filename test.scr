@@ -1,19 +1,13 @@
 
-var a = 35
+var a = 0
+var b = 1
 
-print "hello"
-if a < 30 {
-	if a < 0 {
-		print "negative"
-	}
-	print "yes"
-} else {
-	print "no"
-	if a > 100 {
-		print "big"
-	}
+var i = 0, while i < 10 {
+	print b
+	
+	var c = a + b
+	a = b
+	b = c
+	
+	i = i + 1
 }
-
-print "done"
-
-23 # twenty three
