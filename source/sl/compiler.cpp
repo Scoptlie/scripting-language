@@ -1,4 +1,6 @@
 #include "compiler.h"
+#include "sl/op.h"
+#include "sl/token.h"
 
 #include <cassert>
 #include <cstdarg>
@@ -173,7 +175,7 @@ namespace SL {
 		
 		do {
 			if (nextChar() == 0) {
-				printError(file, line, "unclosed string constant");
+				printError(file, startLine, "unclosed string constant");
 				throw 0;
 			}
 			if (nextChar() == '\\') {
@@ -277,15 +279,322 @@ namespace SL {
 		}
 	}
 	
-	void Lexer::init(char const *file, size_t bufLen, char const *buf) {
-		assert(buf[bufLen - 1] == 0);
+	void Lexer::init(char const *file, size_t nChars, char const *chars) {
+		assert(chars[nChars - 1] == 0);
 		
 		this->file = file;
 		line = 0;
 		
-		this->it = buf;
-		this->end = buf + bufLen;
+		this->it = chars;
+		this->end = chars + nChars;
 		
 		eolIsWs = true;
+	}
+	
+	size_t Compiler::getConst(Val val) {
+		for (auto i = size_t(0); i < consts.len; i++) {
+			if (consts.buf[i].equals(val)) {
+				return i;
+			}
+		}
+		consts.push(val);
+		return consts.len - 1;
+	}
+	
+	Token Compiler::eatToken() {
+		auto r = nextToken;
+		nextToken = lexer.eatToken();
+		return r;
+	}
+	
+	void Compiler::expectToken(TokenKind kind, char const *desc) {
+		if (nextToken.kind != kind) {
+			printError(file, nextToken.line, "expected %s before %s",
+				desc, nextToken.desc()
+			);
+			throw 0;
+		}
+		eatToken();
+	}
+	
+	bool Compiler::eatSepToken() {
+		if (nextToken.kind == ',' || nextToken.kind == tokenKindEol) {
+			eatToken();
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	bool Compiler::eatExpr(size_t minPrecedence) {
+		auto hasLhs = false;
+		if (nextToken.kind == '(') {
+			eatToken();
+			
+			expectExpr();
+			
+			expectToken(TokenKind(')'), "')'");
+			
+			hasLhs = true;
+		} else if (nextToken.kind == tokenKindKwNil) {
+			eatToken();
+			
+			auto arg = getConst(Val::newNil());
+			ops.push(Op{opcodePushc, int32_t(arg)});
+			
+			hasLhs = true;
+		} else if (nextToken.kind == tokenKindKwTrue) {
+			auto arg = getConst(Val::fromBool(true));
+			eatToken();
+			
+			ops.push(Op{opcodePushc, int32_t(arg)});
+			
+			hasLhs = true;
+		} else if (nextToken.kind == tokenKindKwFalse) {
+			auto arg = getConst(Val::fromBool(false));
+			eatToken();
+			
+			ops.push(Op{opcodePushc, int32_t(arg)});
+			
+			hasLhs = true;
+		} else if (nextToken.kind == tokenKindNumber) {
+			auto arg = getConst(Val::newNumber(nextToken.numberVal));
+			eatToken();
+			
+			ops.push(Op{opcodePushc, int32_t(arg)});
+			
+			hasLhs = true;
+		} else if (nextToken.kind == tokenKindString) {
+			auto tokenVal = nextToken.strVal;
+			
+			Val val;
+			if (tokenVal.nChars > 0) {
+				DArray<char> chars;
+				chars.init(tokenVal.nChars);
+				
+				auto i = size_t(0);
+				while (i < tokenVal.nChars) {
+					auto c = tokenVal.chars[i++];
+					if (c == '\\') {
+						// Okay not to do a bounds check here because
+						// '\' will never be the last character in a string constant
+						c = tokenVal.chars[i++];
+						if (c == '"') {
+							chars.push('"');
+						} else if (c == '\\') {
+							chars.push('\\');
+						} else if (c == 'n') {
+							chars.push('\n');
+						} else if (c == 't') {
+							chars.push('\t');
+						} else if (c == 'f') {
+							chars.push('\f');
+						} else if (c == 'r') {
+							chars.push('\r');
+						} else if (c == 'b') {
+							chars.push('\b');
+						} else {
+							chars.deinit();
+							
+							printError(file, nextToken.line, "invalid escape sequence");
+							throw 0;
+						}
+					} else {
+						chars.push(c);
+					}
+				}
+				
+				eatToken();
+				
+				val = Val::newString(
+					String::create(heap, chars.len, chars.buf)
+				);
+				
+				chars.deinit();
+			} else {
+				val = Val::newString(
+					String::create(heap, 0, nullptr)
+				);
+			}
+			
+			auto arg = getConst(val);
+			ops.push(Op{opcodePushc, int32_t(arg)});
+			
+			hasLhs = true;
+		}
+		
+		for (;;) {
+			auto op = nextToken.kind;
+			
+			size_t precedence;
+			if (hasLhs) {
+				if (op == '*' || op == '/' || op == '%') {
+					precedence = 5;
+				} else if (op == '+' || op == '-') {
+					precedence = 4;
+				} else if (op == tokenKindEq || op == tokenKindNEq ||
+					op == '<' || op == '>' || op == tokenKindLtEq || op == tokenKindGtEq
+				) {
+					precedence = 3;
+				} else if (op == tokenKindAndL) {
+					precedence = 2;
+				} else if (op == tokenKindOrL) {
+					precedence = 1;
+				} else {
+					return true;
+				}
+			} else if (op == '-' || op == '!') {
+				precedence = 6;
+			} else {
+				return false;
+			}
+			
+			if (precedence < minPrecedence) {
+				return hasLhs;
+			}
+			
+			eatToken();
+			
+			expectExpr(precedence);
+			
+			if (hasLhs) {
+				if (op == '*') {
+					ops.push(Op{opcodeMul});
+				} else if (op == '/') {
+					ops.push(Op{opcodeDiv});
+				} else if (op == '%') {
+					ops.push(Op{opcodeMod});
+				} else if (op == '+') {
+					ops.push(Op{opcodeAdd});
+				} else if (op == '-') {
+					ops.push(Op{opcodeSub});
+				} else if (op == tokenKindEq) {
+					ops.push(Op{opcodeCmpEq});
+				} else if (op == tokenKindNEq) {
+					ops.push(Op{opcodeCmpNEq});
+				} else if (op == '<') {
+					ops.push(Op{opcodeCmpLt});
+				} else if (op == '>') {
+					ops.push(Op{opcodeCmpGt});
+				} else if (op == tokenKindLtEq) {
+					ops.push(Op{opcodeCmpLtEq});
+				} else if (op == tokenKindGtEq) {
+					ops.push(Op{opcodeCmpGtEq});
+				} else if (op == tokenKindAndL) {
+					ops.push(Op{opcodeAndL});
+				} else if (op == tokenKindOrL) {
+					ops.push(Op{opcodeOrL});
+				} else {
+					assert(!"unreachable");
+				}
+			} else if (op == '-') {
+				ops.push(Op{opcodeNeg});
+			} else if (op == '!') {
+				ops.push(Op{opcodeNotL});
+			} else {
+				assert(!"unreachable");
+			}
+			
+			hasLhs = true;
+		}
+	}
+	
+	void Compiler::expectExpr(size_t minPrecedence) {
+		if (!eatExpr(minPrecedence)) {
+			printError(file, nextToken.line, "expected expression before %s",
+				nextToken.desc()
+			);
+			throw 0;
+		}
+	}
+	
+	size_t Compiler::eatExprList() {
+		auto r = size_t(0);
+		while (eatExpr()) {
+			r++;
+			if (!eatSepToken()) {
+				break;
+			}
+		}
+		return r;
+	}
+	
+	bool Compiler::eatStmt() {
+		if (nextToken.kind == tokenKindKwPrint) {
+			eatToken();
+			
+			expectExpr();
+			
+			ops.push(Op{opcodePrint});
+			
+			return true;
+		} else if (nextToken.kind == tokenKindKwReturn) {
+			eatToken();
+			
+			if (!eatExpr()) {
+				auto arg = getConst(Val::newNil());
+				ops.push(Op{opcodePushc, int32_t(arg)});
+			}
+			
+			ops.push(Op{opcodeRet});
+			
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	void Compiler::expectStmt() {
+		if (!eatStmt()) {
+			printError(file, nextToken.line, "expected statement before %s",
+				nextToken.desc()
+			);
+			throw 0;
+		}
+	}
+	
+	size_t Compiler::eatStmtList() {
+		auto r = size_t(0);
+		while (eatStmt()) {
+			r++;
+			if (!eatSepToken()) {
+				break;
+			}
+		}
+		return r;
+	}
+	
+	Func *Compiler::run(Heap *heap, char const *file, size_t nChars, char const *chars) {
+		this->heap = heap;
+		
+		this->file = file;
+		
+		lexer.init(file, nChars, chars);
+		nextToken = lexer.eatToken();
+		
+		consts.init(8);
+		ops.init(32);
+		
+		eatStmtList();
+		
+		expectToken(tokenKindEof, "end of file");
+		
+		if (ops.buf[ops.len - 1].opcode != opcodeRet) {
+			auto arg = getConst(Val::newNil());
+			ops.push(Op{opcodePushc, int32_t(arg)});
+			ops.push(Op{opcodeRet});
+		}
+		
+		lexer.deinit();
+		
+		auto r = Func::create(heap);
+		r->nConsts = consts.len;
+		r->consts = consts.buf;
+		r->nOps = ops.len;
+		r->ops = ops.buf;
+		r->nParams = 0;
+		r->nVars = 0;
+		
+		return r;
 	}
 }

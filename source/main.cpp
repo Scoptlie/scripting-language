@@ -34,21 +34,15 @@ int main(int argc, char **argv) {
 	auto chars = loadString(file, &nChars);
 	
 	try {
-		Lexer lexer;
-		lexer.init(file, nChars + 1, chars);
+		auto f = Compiler{}.run(&heap, file, nChars + 1, chars);
 		
-		Token t;
-		do {
-			t = lexer.eatToken();
-			printf("%-3d %-16s", int(t.line), t.desc());
-			if (t.kind == tokenKindNumber) {
-				printf("%.14g\n", t.numberVal);
-			} else if (t.kind == tokenKindName || t.kind == tokenKindString) {
-				printf("\"%.*s\"\n", int(t.strVal.nChars), t.strVal.chars);
-			} else {
-				puts("");
-			}
-		} while (t.kind != tokenKindEof);
+		auto t = Thread::create(&heap);
+		
+		Val result;
+		t->call(f, 0, nullptr, &result);
+		
+		auto resultStr = String::createFromVal(&heap, result);
+		printf("result: %s\n", resultStr->chars);
 	} catch (...) { }
 	
 	heap.deinit();

@@ -181,7 +181,7 @@ namespace SL {
 			case opcodeCmpGtEq: {
 				auto b = stack.pop(), a = stack.pop();
 				if (a.isNumber() && b.isNumber()) {
-					stack.push(Val::fromBool(a.numberVal <= b.numberVal));
+					stack.push(Val::fromBool(a.numberVal >= b.numberVal));
 				} else {
 					stack.push(Val::fromBool(false));
 				}
