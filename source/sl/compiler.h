@@ -46,12 +46,20 @@ namespace SL {
 		Func *run(Heap *heap, char const *file, size_t nChars, char const *chars);
 		
 	private:
-		struct ActiveLocal {
-			size_t idx;
+		// Record of a var or param
+		struct Local {
+			// Offset on the stack relative to the function's
+			// base stack index
+			int32_t idx;
 			struct {
 				size_t nChars;
 				char const *chars;
 			} name;
+		};
+		
+		// Record of a lexical scope
+		struct Scope {
+			size_t firstActiveLocal;
 		};
 		
 		Heap *heap;
@@ -64,11 +72,14 @@ namespace SL {
 		DArray<Val> consts;
 		DArray<Op> ops;
 		size_t nParams, nVars;
-		DArray<ActiveLocal> activeLocals;
+		DArray<Local> activeLocals;
+		DArray<Scope> scopes;
 		
 		size_t getConst(Val val);
-		size_t createVar(size_t nameNChars, char const *nameChars);
-		bool getLocal(size_t nameNChars, char const *nameChars, size_t *oIdx);
+		int32_t createVar(size_t nameNChars, char const *nameChars);
+		bool getLocal(size_t nameNChars, char const *nameChars, int32_t *oIdx);
+		void enterScope(bool isLoop = false);
+		void exitScope();
 		
 		Token eatToken();
 		Token expectToken(TokenKind kind, char const *desc);

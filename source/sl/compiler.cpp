@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 static void printError(char const *file, size_t line, char const *msgFmt, ...) {
@@ -301,16 +302,16 @@ namespace SL {
 		return consts.len - 1;
 	}
 	
-	size_t Compiler::createVar(size_t nameNChars, char const *nameChars) {
+	int32_t Compiler::createVar(size_t nameNChars, char const *nameChars) {
 		nVars++;
-		activeLocals.push(ActiveLocal{
-			.idx = nVars - 1,
+		activeLocals.push(Local{
+			.idx = int32_t(nVars - 1),
 			.name = {nameNChars, nameChars}
 		});
 		return nVars - 1;
 	}
 	
-	bool Compiler::getLocal(size_t nameNChars, char const *nameChars, size_t *oIdx) {
+	bool Compiler::getLocal(size_t nameNChars, char const *nameChars, int32_t *oIdx) {
 		for (auto i = activeLocals.len; i-- > 0;) {
 			auto v = &activeLocals.buf[i];
 			if (nameNChars == v->name.nChars &&
@@ -321,6 +322,19 @@ namespace SL {
 			}
 		}
 		return false;
+	}
+	
+	void Compiler::enterScope(bool isLoop) {
+		scopes.push(Scope{
+			.firstActiveLocal = activeLocals.len
+		});
+	}
+	
+	void Compiler::exitScope() {
+		auto s = scopes.pop();
+		
+		// Pop locals defined within this scope
+		activeLocals.len = s.firstActiveLocal;
 	}
 	
 	Token Compiler::eatToken() {
@@ -444,9 +458,9 @@ namespace SL {
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindName) {
-			size_t idx;
+			int32_t idx;
 			if (getLocal(nextToken.strVal.nChars, nextToken.strVal.chars, &idx)) {
-				ops.push(Op{opcodeVar, int32_t(idx)});
+				ops.push(Op{opcodeVar, idx});
 			} else {
 				printError(file, nextToken.line, "unresolved name '%.*s'",
 					int(nextToken.strVal.nChars),
@@ -558,11 +572,15 @@ namespace SL {
 	
 	bool Compiler::eatStmt() {
 		if (nextToken.kind == '{') {
+			enterScope();
+			
 			eatToken();
 			
 			eatStmtList();
 			
 			expectToken(TokenKind('}'), "'}'");
+			
+			exitScope();
 			
 			return true;
 		} else if (nextToken.kind == tokenKindKwPrint) {
@@ -585,7 +603,7 @@ namespace SL {
 				
 				expectExpr();
 				
-				ops.push(Op{opcodeSetVar, int32_t(idx)});
+				ops.push(Op{opcodeSetVar, idx});
 			}
 			
 			return true;
@@ -701,6 +719,7 @@ namespace SL {
 		nParams = 0;
 		nVars = 0;
 		activeLocals.init(8);
+		scopes.init(8);
 		
 		eatStmtList();
 		
