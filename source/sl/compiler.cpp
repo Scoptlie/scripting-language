@@ -301,20 +301,42 @@ namespace SL {
 		return consts.len - 1;
 	}
 	
+	size_t Compiler::createVar(size_t nameNChars, char const *nameChars) {
+		nVars++;
+		activeVars.push(ActiveVar{
+			.idx = nVars - 1,
+			.name = {nameNChars, nameChars}
+		});
+		return nVars - 1;
+	}
+	
+	bool Compiler::getVar(size_t nameNChars, char const *nameChars, size_t *oIdx) {
+		for (auto i = activeVars.len; i-- > 0;) {
+			auto v = &activeVars.buf[i];
+			if (nameNChars == v->name.nChars &&
+				memcmp(nameChars, v->name.chars, nameNChars) == 0
+			) {
+				*oIdx = v->idx;
+				return true;
+			}
+		}
+		return false;
+	}
+	
 	Token Compiler::eatToken() {
 		auto r = nextToken;
 		nextToken = lexer.eatToken();
 		return r;
 	}
 	
-	void Compiler::expectToken(TokenKind kind, char const *desc) {
+	Token Compiler::expectToken(TokenKind kind, char const *desc) {
 		if (nextToken.kind != kind) {
 			printError(file, nextToken.line, "expected %s before %s",
 				desc, nextToken.desc()
 			);
 			throw 0;
 		}
-		eatToken();
+		return eatToken();
 	}
 	
 	bool Compiler::eatSepToken() {
@@ -340,28 +362,28 @@ namespace SL {
 			eatToken();
 			
 			auto arg = getConst(Val::newNil());
-			ops.push(Op{opcodePushc, int32_t(arg)});
+			ops.push(Op{opcodeConst, int32_t(arg)});
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindKwTrue) {
 			auto arg = getConst(Val::fromBool(true));
 			eatToken();
 			
-			ops.push(Op{opcodePushc, int32_t(arg)});
+			ops.push(Op{opcodeConst, int32_t(arg)});
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindKwFalse) {
 			auto arg = getConst(Val::fromBool(false));
 			eatToken();
 			
-			ops.push(Op{opcodePushc, int32_t(arg)});
+			ops.push(Op{opcodeConst, int32_t(arg)});
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindNumber) {
 			auto arg = getConst(Val::newNumber(nextToken.numberVal));
 			eatToken();
 			
-			ops.push(Op{opcodePushc, int32_t(arg)});
+			ops.push(Op{opcodeConst, int32_t(arg)});
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindString) {
@@ -418,7 +440,22 @@ namespace SL {
 			}
 			
 			auto arg = getConst(val);
-			ops.push(Op{opcodePushc, int32_t(arg)});
+			ops.push(Op{opcodeConst, int32_t(arg)});
+			
+			hasLhs = true;
+		} else if (nextToken.kind == tokenKindName) {
+			size_t idx;
+			if (getVar(nextToken.strVal.nChars, nextToken.strVal.chars, &idx)) {
+				ops.push(Op{opcodeVar, int32_t(idx)});
+			} else {
+				printError(file, nextToken.line, "unresolved name '%.*s'",
+					int(nextToken.strVal.nChars),
+					nextToken.strVal.chars
+				);
+				throw 0;
+			}
+			
+			eatToken();
 			
 			hasLhs = true;
 		}
@@ -520,7 +557,15 @@ namespace SL {
 	}
 	
 	bool Compiler::eatStmt() {
-		if (nextToken.kind == tokenKindKwPrint) {
+		if (nextToken.kind == '{') {
+			eatToken();
+			
+			eatStmtList();
+			
+			expectToken(TokenKind('}'), "'}'");
+			
+			return true;
+		} else if (nextToken.kind == tokenKindKwPrint) {
 			eatToken();
 			
 			expectExpr();
@@ -528,15 +573,77 @@ namespace SL {
 			ops.push(Op{opcodePrint});
 			
 			return true;
+		} else if (nextToken.kind == tokenKindKwVar) {
+			eatToken();
+			
+			auto nameToken = expectToken(tokenKindName, "name");
+			
+			auto idx = createVar(nameToken.strVal.nChars, nameToken.strVal.chars);
+			
+			if (nextToken.kind == '=') {
+				eatToken();
+				
+				expectExpr();
+				
+				ops.push(Op{opcodeSetVar, int32_t(idx)});
+			}
+			
+			return true;
+		} else if (nextToken.kind == tokenKindKwIf) {
+			eatToken();
+			
+			expectExpr();
+			
+			auto jmpElseOp = ops.len;
+			ops.push(Op{opcodeJmpN, 0});
+			
+			expectStmt();
+			
+			if (nextToken.kind == tokenKindKwElse) {
+				eatToken();
+				
+				auto jmpEndOp = ops.len;
+				ops.push(Op{opcodeJmp, 0});
+				
+				ops.buf[jmpElseOp].arg = ops.len;
+				
+				expectStmt();
+				
+				ops.buf[jmpEndOp].arg = ops.len;
+			} else {
+				ops.buf[jmpElseOp].arg = ops.len;
+			}
+			
+			return true;
 		} else if (nextToken.kind == tokenKindKwReturn) {
 			eatToken();
 			
 			if (!eatExpr()) {
 				auto arg = getConst(Val::newNil());
-				ops.push(Op{opcodePushc, int32_t(arg)});
+				ops.push(Op{opcodeConst, int32_t(arg)});
 			}
 			
 			ops.push(Op{opcodeRet});
+			
+			return true;
+		} else if (eatExpr()) {
+			if (nextToken.kind == '=') {
+				auto getOp = ops.pop();
+				if (getOp.opcode != opcodeVar) {
+					printError(file, nextToken.line, "assignment to unassignable expression");
+					throw 0;
+				}
+				
+				eatToken();
+				
+				expectExpr();
+				
+				if (getOp.opcode == opcodeVar) {
+					ops.push(Op{opcodeSetVar, getOp.arg});
+				}
+			} else {
+				ops.push(Op{opcodeEat});
+			}
 			
 			return true;
 		} else {
@@ -574,6 +681,9 @@ namespace SL {
 		
 		consts.init(8);
 		ops.init(32);
+		nParams = 0;
+		nVars = 0;
+		activeVars.init(8);
 		
 		eatStmtList();
 		
@@ -581,7 +691,7 @@ namespace SL {
 		
 		if (ops.buf[ops.len - 1].opcode != opcodeRet) {
 			auto arg = getConst(Val::newNil());
-			ops.push(Op{opcodePushc, int32_t(arg)});
+			ops.push(Op{opcodeConst, int32_t(arg)});
 			ops.push(Op{opcodeRet});
 		}
 		
@@ -592,8 +702,8 @@ namespace SL {
 		r->consts = consts.buf;
 		r->nOps = ops.len;
 		r->ops = ops.buf;
-		r->nParams = 0;
-		r->nVars = 0;
+		r->nParams = nParams;
+		r->nVars = nVars;
 		
 		return r;
 	}

@@ -62,19 +62,25 @@ namespace SL {
 			assert(opIt < func->ops + func->nOps);
 			auto op = *opIt++;
 			switch (op.opcode) {
-			case opcodePushc: {
+			case opcodeConst: {
 				assert(op.arg >= 0 && op.arg < func->nConsts);
 				stack.push(consts[op.arg]);
 				break;
 			}
-			case opcodePush: {
+			case opcodeVar: {
 				assert(baseStackIdx + op.arg < stack.len);
 				stack.push(stack.buf[baseStackIdx + op.arg]);
 				break;
 			}
-			case opcodePop: {
+			case opcodeSetVar: {
+				assert(stack.len > 0);
 				assert(baseStackIdx + op.arg < stack.len);
 				stack.buf[baseStackIdx + op.arg] = stack.pop();
+				break;
+			}
+			case opcodeEat: {
+				assert(stack.len > 0);
+				stack.pop();
 				break;
 			}
 			case opcodeNeg: {
@@ -242,6 +248,8 @@ namespace SL {
 				break;
 			}
 			case opcodeRet: {
+				assert(stack.len == baseStackIdx + func->nVars + 1);
+				
 				// Pop the return value off the stack
 				auto v = stack.pop();
 				// Pop local variables, arguments, and the current function off the stack

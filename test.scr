@@ -1,5 +1,19 @@
 
-print 1
-print 2 + 3
+var a = 35
 
-return 10
+print "hello"
+if a < 30 {
+	if a < 0 {
+		print "negative"
+	}
+	print "yes"
+} else {
+	print "no"
+	if a > 100 {
+		print "big"
+	}
+}
+
+print "done"
+
+23 # twenty three

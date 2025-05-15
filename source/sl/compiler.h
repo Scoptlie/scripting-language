@@ -46,6 +46,14 @@ namespace SL {
 		Func *run(Heap *heap, char const *file, size_t nChars, char const *chars);
 		
 	private:
+		struct ActiveVar {
+			size_t idx;
+			struct {
+				size_t nChars;
+				char const *chars;
+			} name;
+		};
+		
 		Heap *heap;
 		
 		char const *file;
@@ -55,11 +63,15 @@ namespace SL {
 		
 		DArray<Val> consts;
 		DArray<Op> ops;
+		size_t nParams, nVars;
+		DArray<ActiveVar> activeVars;
 		
 		size_t getConst(Val val);
+		size_t createVar(size_t nameNChars, char const *nameChars);
+		bool getVar(size_t nameNChars, char const *nameChars, size_t *oIdx);
 		
 		Token eatToken();
-		void expectToken(TokenKind kind, char const *desc);
+		Token expectToken(TokenKind kind, char const *desc);
 		
 		bool eatSepToken();
 		

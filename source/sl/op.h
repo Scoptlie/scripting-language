@@ -4,9 +4,11 @@
 
 namespace SL {
 	enum Opcode : uint8_t {
-		opcodePushc,
-		opcodePush,
-		opcodePop,
+		opcodeConst,
+		opcodeVar,
+		opcodeSetVar,
+		
+		opcodeEat,
 		
 		opcodeNeg,
 		opcodeAdd,
