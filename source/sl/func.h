@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+
+#include "heap.h"
 
 namespace SL {
 	enum Opcode : uint8_t {
@@ -39,5 +42,19 @@ namespace SL {
 	
 	struct Op {
 		int32_t opcode: 8, arg: 24;
+	};
+	
+	struct Val;
+	
+	struct Func : public Object {
+		size_t nConsts;
+		Val *consts;
+		
+		size_t nOps;
+		Op *ops;
+		
+		size_t nParams, nVars;
+		
+		static Func *create(Heap *heap);
 	};
 }

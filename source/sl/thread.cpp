@@ -4,8 +4,6 @@
 #include <cmath>
 #include <cstdio>
 
-#include "heap.h"
-#include "op.h"
 #include "val.h"
 
 namespace SL {
@@ -25,6 +23,8 @@ namespace SL {
 				stack.push(Val::newNil());
 			}
 		}
+		
+		nArgs = func->nParams;
 		
 		callStack.push(Call{
 			.func = func,
@@ -292,7 +292,7 @@ namespace SL {
 	}
 	
 	Thread *Thread::create(Heap *heap) {
-		auto r = (Thread*)heap->createObject(sizeof(Thread), typeThread);
+		auto r = (Thread*)heap->createObject(sizeof(Thread), objectTypeThread);
 		r->heap = heap;
 		r->stack.init(64);
 		r->callStack.init(8);

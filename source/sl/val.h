@@ -3,7 +3,7 @@
 #include <concepts>
 #include <cstddef>
 
-#include "op.h"
+#include "heap.h"
 
 namespace SL {
 	enum Type {
@@ -87,12 +87,6 @@ namespace SL {
 		}
 	};
 	
-	struct Heap;
-	
-	struct Object {
-		Type type;
-	};
-	
 	struct String : public Object {
 		size_t nChars;
 		char chars[1];
@@ -102,15 +96,5 @@ namespace SL {
 		static String *createFromVal(Heap *heap, Val val);
 	};
 	
-	struct Func : public Object {
-		size_t nConsts;
-		Val *consts;
-		
-		size_t nOps;
-		Op *ops;
-		
-		size_t nParams, nVars;
-		
-		static Func *create(Heap *heap);
-	};
+	
 }

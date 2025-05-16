@@ -1,6 +1,4 @@
 #include "compiler.h"
-#include "sl/op.h"
-#include "sl/token.h"
 
 #include <cassert>
 #include <cstdarg>
@@ -481,7 +479,7 @@ namespace SL {
 			nParams = 0;
 			nVars = 0;
 			activeLocals.init(8);
-			prevScopes.init(8);
+			scopes.init(8);
 			
 			expectToken(TokenKind('('), "'('");
 			

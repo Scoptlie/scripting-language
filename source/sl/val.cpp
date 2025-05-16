@@ -1,5 +1,6 @@
 #include "val.h"
 
+#include <cassert>
 #include <cstdio>
 #include <cstring>
 
@@ -28,7 +29,7 @@ namespace SL {
 	String *String::create(Heap *heap, size_t nChars) {
 		auto r = (String*)heap->createObject(
 			sizeof(String) + nChars,
-			typeString
+			objectTypeString
 		);
 		r->nChars = nChars;
 		r->chars[nChars] = 0;
@@ -63,9 +64,5 @@ namespace SL {
 		
 		assert(!"unreachable");
 		return nullptr;
-	}
-	
-	Func *Func::create(Heap *heap) {
-		return (Func*)heap->createObject(sizeof(Func), typeFunc);
 	}
 }

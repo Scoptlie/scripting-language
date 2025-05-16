@@ -1,7 +1,8 @@
 #pragma once
 
 #include "darray.h"
-#include "val.h"
+#include "func.h"
+#include "heap.h"
 
 namespace SL {
 	struct Call {
@@ -10,6 +11,8 @@ namespace SL {
 		size_t nArgs;
 		size_t baseStackIdx;
 	};
+	
+	struct Val;
 	
 	struct Thread : public Object {
 		Heap *heap;

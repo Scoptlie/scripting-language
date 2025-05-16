@@ -1,10 +1,11 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #include "darray.h"
+#include "func.h"
 #include "heap.h"
-#include "op.h"
 #include "token.h"
 #include "val.h"
 

@@ -2,12 +2,21 @@
 
 #include <cstddef>
 
-#include "thread.h"
-#include "val.h"
-
 namespace SL {
+	enum ObjectType {
+		objectTypeString,
+		//objectTypeArray,
+		//objectTypeStruct,
+		objectTypeFunc,
+		objectTypeThread,
+	};
+	
+	struct Object {
+		ObjectType type;
+	};
+	
 	struct Heap {
-		Object *createObject(size_t size, Type type);
+		Object *createObject(size_t size, ObjectType type);
 		
 		void init() { }
 		void deinit() { }

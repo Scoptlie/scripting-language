@@ -6,6 +6,8 @@
 #include "sl/compiler.h"
 #include "sl/darray.h"
 #include "sl/heap.h"
+#include "sl/thread.h"
+#include "sl/val.h"
 
 char *loadString(char const *file, size_t *oNChars) {
 	auto s = fopen(file, "rb");
