@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 
+#include "array.h"
 #include "val.h"
 
 namespace SL {
@@ -35,7 +36,7 @@ namespace SL {
 		
 		// Push local variables onto the stack,
 		// defaulted to nils
-		for (auto i = size_t(0); i < func->nVars; i++) {
+		for (auto i = size_t(0); i < func->nLocals; i++) {
 			stack.push(Val::newNil());
 		}
 	}
@@ -62,12 +63,12 @@ namespace SL {
 			assert(opIt < func->ops + func->nOps);
 			auto op = *opIt++;
 			switch (op.opcode) {
-			case opcodeConst: {
+			case opcodeGetConst: {
 				assert(op.arg >= 0 && op.arg < func->nConsts);
 				stack.push(consts[op.arg]);
 				break;
 			}
-			case opcodeVar: {
+			case opcodeGetVar: {
 				assert(baseStackIdx + op.arg < stack.len);
 				stack.push(stack.buf[baseStackIdx + op.arg]);
 				break;
@@ -76,6 +77,55 @@ namespace SL {
 				assert(stack.len > 0);
 				assert(baseStackIdx + op.arg < stack.len);
 				stack.buf[baseStackIdx + op.arg] = stack.pop();
+				break;
+			}
+			case opcodeGetElem: {
+				assert(stack.len >= 2);
+				
+				auto subscript = stack.pop();
+				auto base = stack.pop();
+				
+				if (base.isArray() && subscript.isNumber()) {
+					auto array = base.arrayVal;
+					auto idxF = subscript.numberVal;
+					
+					if (idxF == trunc(idxF) && !isnan(idxF) && !isinf(idxF)) {
+						auto idx = ptrdiff_t(idxF);
+						
+						if (idx >= 0 && idx < array->nElems) {
+							stack.push(array->elems[idx]);
+							
+							break;
+						}
+					}
+				}
+				
+				stack.push(Val::newNil());
+				
+				break;
+			}
+			case opcodeSetElem: {
+				assert(stack.len >= 3);
+				
+				auto v = stack.pop();
+				auto subscript = stack.pop();
+				auto base = stack.pop();
+				
+				if (base.isArray() && subscript.isNumber()) {
+					auto array = base.arrayVal;
+					auto idxF = subscript.numberVal;
+					
+					if (idxF == trunc(idxF) && !isnan(idxF) && !isinf(idxF)) {
+						auto idx = ptrdiff_t(idxF);
+						
+						if (idx >= 0 && idx < array->nElems) {
+							array->elems[idx] = v;
+							
+							break;
+						}
+					}
+				}
+				
 				break;
 			}
 			case opcodeEat: {
@@ -208,6 +258,18 @@ namespace SL {
 				stack.push(Val::fromBool(a.asBool() || b.asBool()));
 				break;
 			}
+			case opcodeMakeArr: {
+				auto nElems = op.arg;
+				assert(stack.len >= nElems);
+				
+				auto r = Array::create(heap, nElems);
+				memcpy(r->elems, stack.buf + stack.len - nElems, sizeof(Val) * nElems);
+				stack.len -= nElems;
+				
+				stack.push(Val::newArray(r));
+				
+				break;
+			}
 			case opcodePrint: {
 				auto v = stack.pop();
 				auto str = String::createFromVal(heap, v);
@@ -248,7 +310,7 @@ namespace SL {
 				break;
 			}
 			case opcodeRet: {
-				assert(stack.len == baseStackIdx + func->nVars + 1);
+				assert(stack.len == baseStackIdx + func->nLocals + 1);
 				
 				// Pop the return value off the stack
 				auto v = stack.pop();

@@ -5,7 +5,7 @@
 namespace SL {
 	enum ObjectType {
 		objectTypeString,
-		//objectTypeArray,
+		objectTypeArray,
 		//objectTypeStruct,
 		objectTypeFunc,
 		objectTypeThread,

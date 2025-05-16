@@ -300,18 +300,18 @@ namespace SL {
 		return consts.len - 1;
 	}
 	
-	int32_t Compiler::createVar(size_t nameNChars, char const *nameChars) {
-		nVars++;
-		activeLocals.push(Local{
-			.idx = int32_t(nVars - 1),
+	int32_t Compiler::createLocal(size_t nameNChars, char const *nameChars) {
+		nLocals++;
+		activeVars.push(Var{
+			.idx = int32_t(nLocals - 1),
 			.name = {nameNChars, nameChars}
 		});
-		return nVars - 1;
+		return int32_t(nLocals - 1);
 	}
 	
-	bool Compiler::getLocal(size_t nameNChars, char const *nameChars, int32_t *oIdx) {
-		for (auto i = activeLocals.len; i-- > 0;) {
-			auto v = &activeLocals.buf[i];
+	bool Compiler::getVar(size_t nameNChars, char const *nameChars, int32_t *oIdx) {
+		for (auto i = activeVars.len; i-- > 0;) {
+			auto v = &activeVars.buf[i];
 			if (nameNChars == v->name.nChars &&
 				memcmp(nameChars, v->name.chars, nameNChars) == 0
 			) {
@@ -325,7 +325,7 @@ namespace SL {
 	void Compiler::enterScope(bool isLoop) {
 		scopes.push(Scope{
 			.firstOp = ops.len,
-			.firstActiveLocal = activeLocals.len,
+			.firstActiveVar = activeVars.len,
 			.isLoop = isLoop,
 		});
 	}
@@ -341,7 +341,7 @@ namespace SL {
 		}
 		
 		// Pop locals defined within this scope
-		activeLocals.len = s.firstActiveLocal;
+		activeVars.len = s.firstActiveVar;
 	}
 	
 	Token Compiler::eatToken() {
@@ -383,28 +383,28 @@ namespace SL {
 			eatToken();
 			
 			auto arg = getConst(Val::newNil());
-			ops.push(Op{opcodeConst, int32_t(arg)});
+			ops.push(Op{opcodeGetConst, int32_t(arg)});
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindKwTrue) {
 			auto arg = getConst(Val::fromBool(true));
 			eatToken();
 			
-			ops.push(Op{opcodeConst, int32_t(arg)});
+			ops.push(Op{opcodeGetConst, int32_t(arg)});
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindKwFalse) {
 			auto arg = getConst(Val::fromBool(false));
 			eatToken();
 			
-			ops.push(Op{opcodeConst, int32_t(arg)});
+			ops.push(Op{opcodeGetConst, int32_t(arg)});
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindNumber) {
 			auto arg = getConst(Val::newNumber(nextToken.numberVal));
 			eatToken();
 			
-			ops.push(Op{opcodeConst, int32_t(arg)});
+			ops.push(Op{opcodeGetConst, int32_t(arg)});
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindString) {
@@ -461,7 +461,17 @@ namespace SL {
 			}
 			
 			auto arg = getConst(val);
-			ops.push(Op{opcodeConst, int32_t(arg)});
+			ops.push(Op{opcodeGetConst, int32_t(arg)});
+			
+			hasLhs = true;
+		} else if (nextToken.kind == '[') {
+			eatToken();
+			
+			auto nElems = eatExprList();
+			
+			expectToken(TokenKind(']'), "']'");
+			
+			ops.push(Op{opcodeMakeArr, int32_t(nElems)});
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindKwFunc) {
@@ -470,21 +480,21 @@ namespace SL {
 			auto prevConsts = consts;
 			auto prevOps = ops;
 			auto prevNParams = nParams;
-			auto prevNVars = nVars;
-			auto prevActiveLocals = activeLocals;
+			auto prevNVars = nLocals;
+			auto prevActiveLocals = activeVars;
 			auto prevScopes = scopes;
 			
 			consts.init(8);
 			ops.init(32);
 			nParams = 0;
-			nVars = 0;
-			activeLocals.init(8);
+			nLocals = 0;
+			activeVars.init(8);
 			scopes.init(8);
 			
 			expectToken(TokenKind('('), "'('");
 			
 			while (nextToken.kind == tokenKindName) {
-				activeLocals.push(Local{
+				activeVars.push(Var{
 					.idx = 0,
 					.name = {nextToken.strVal.nChars, nextToken.strVal.chars},
 				});
@@ -497,10 +507,10 @@ namespace SL {
 			
 			expectToken(TokenKind(')'), "')'");
 			
-			nParams = activeLocals.len;
+			nParams = activeVars.len;
 			
-			for (auto i = size_t(0); i < activeLocals.len; i++) {
-				activeLocals.buf[i].idx = int32_t(i) - int32_t(activeLocals.len);
+			for (auto i = size_t(0); i < activeVars.len; i++) {
+				activeVars.buf[i].idx = int32_t(i) - int32_t(activeVars.len);
 			}
 			
 			expectToken(TokenKind('{'), "");
@@ -515,23 +525,23 @@ namespace SL {
 			func->nOps = ops.len;
 			func->ops = ops.buf;
 			func->nParams = nParams;
-			func->nVars = nVars;
+			func->nLocals = nLocals;
 			
 			scopes = prevScopes;
-			activeLocals = prevActiveLocals;
-			nVars = prevNVars;
+			activeVars = prevActiveLocals;
+			nLocals = prevNVars;
 			nParams = prevNParams;
 			ops = prevOps;
 			consts = prevConsts;
 			
 			auto arg = getConst(Val::newFunc(func));
-			ops.push(Op{opcodeConst, int32_t(arg)});
+			ops.push(Op{opcodeGetConst, int32_t(arg)});
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindName) {
 			int32_t idx;
-			if (getLocal(nextToken.strVal.nChars, nextToken.strVal.chars, &idx)) {
-				ops.push(Op{opcodeVar, idx});
+			if (getVar(nextToken.strVal.nChars, nextToken.strVal.chars, &idx)) {
+				ops.push(Op{opcodeGetVar, idx});
 			} else {
 				printError(file, nextToken.line, "unresolved name '%.*s'",
 					int(nextToken.strVal.nChars),
@@ -546,7 +556,7 @@ namespace SL {
 		}
 		
 		for (;;) {
-			if (nextToken.kind == '(') {
+			if (hasLhs && nextToken.kind == '(') {
 				eatToken();
 				
 				auto nArgs = eatExprList();
@@ -554,6 +564,14 @@ namespace SL {
 				expectToken(TokenKind(')'), "')'");
 				
 				ops.push(Op{opcodeCall, int32_t(nArgs)});
+			} else if (hasLhs && nextToken.kind == '[') {
+				eatToken();
+				
+				expectExpr();
+				
+				expectToken(TokenKind(']'), "']'");
+				
+				ops.push(Op{opcodeGetElem});
 			} else {
 				auto op = nextToken.kind;
 				
@@ -677,7 +695,7 @@ namespace SL {
 			
 			auto nameToken = expectToken(tokenKindName, "name");
 			
-			auto idx = createVar(nameToken.strVal.nChars, nameToken.strVal.chars);
+			auto idx = createLocal(nameToken.strVal.nChars, nameToken.strVal.chars);
 			
 			if (nextToken.kind == '=') {
 				eatToken();
@@ -784,7 +802,7 @@ namespace SL {
 			
 			if (!eatExpr()) {
 				auto arg = getConst(Val::newNil());
-				ops.push(Op{opcodeConst, int32_t(arg)});
+				ops.push(Op{opcodeGetConst, int32_t(arg)});
 			}
 			
 			ops.push(Op{opcodeRet});
@@ -793,7 +811,9 @@ namespace SL {
 		} else if (eatExpr()) {
 			if (nextToken.kind == '=') {
 				auto getOp = ops.pop();
-				if (getOp.opcode != opcodeVar) {
+				if (getOp.opcode != opcodeGetVar &&
+					getOp.opcode != opcodeGetElem
+				) {
 					printError(file, nextToken.line, "assignment to unassignable expression");
 					throw 0;
 				}
@@ -802,8 +822,10 @@ namespace SL {
 				
 				expectExpr();
 				
-				if (getOp.opcode == opcodeVar) {
+				if (getOp.opcode == opcodeGetVar) {
 					ops.push(Op{opcodeSetVar, getOp.arg});
+				} else if (getOp.opcode == opcodeGetElem) {
+					ops.push(Op{opcodeSetElem});
 				}
 			} else {
 				ops.push(Op{opcodeEat});
@@ -840,7 +862,7 @@ namespace SL {
 		
 		if (ops.len == 0 || ops.buf[ops.len - 1].opcode != opcodeRet) {
 			auto arg = getConst(Val::newNil());
-			ops.push(Op{opcodeConst, int32_t(arg)});
+			ops.push(Op{opcodeGetConst, int32_t(arg)});
 			ops.push(Op{opcodeRet});
 		}
 	}
@@ -856,8 +878,8 @@ namespace SL {
 		consts.init(8);
 		ops.init(32);
 		nParams = 0;
-		nVars = 0;
-		activeLocals.init(8);
+		nLocals = 0;
+		activeVars.init(8);
 		scopes.init(8);
 		breakOps.init(8);
 		
@@ -872,18 +894,18 @@ namespace SL {
 			r->nOps = ops.len;
 			r->ops = ops.buf;
 			r->nParams = nParams;
-			r->nVars = nVars;
+			r->nLocals = nLocals;
 			
 			breakOps.deinit();
 			scopes.deinit();
-			activeLocals.deinit();
+			activeVars.deinit();
 			lexer.deinit();
 			
 			return r;
 		} catch (...) {
 			breakOps.deinit();
 			scopes.deinit();
-			activeLocals.deinit();
+			activeVars.deinit();
 			ops.deinit();
 			consts.deinit();
 			lexer.deinit();

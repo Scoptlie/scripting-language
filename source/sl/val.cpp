@@ -54,6 +54,9 @@ namespace SL {
 			return create(heap, (len >= 0)? len : 0, buf);
 		} else if (val.isString()) {
 			return val.stringVal;
+		} else if (val.isArray()) {
+			auto len = snprintf(buf, sizeof(buf), "array@%p", val.arrayVal);
+			return create(heap, (len >= 0)? len : 0, buf);
 		} else if (val.isFunc()) {
 			auto len = snprintf(buf, sizeof(buf), "func@%p", val.funcVal);
 			return create(heap, (len >= 0)? len : 0, buf);

@@ -7,12 +7,13 @@
 
 namespace SL {
 	enum Opcode : uint8_t {
-		opcodeConst,
-		opcodeVar,
+		opcodeGetConst,
+		opcodeGetVar,
 		opcodeSetVar,
+		opcodeGetElem,
+		opcodeSetElem,
 		
 		opcodeEat,
-		
 		opcodeNeg,
 		opcodeAdd,
 		opcodeSub,
@@ -30,6 +31,8 @@ namespace SL {
 		opcodeNotL,
 		opcodeAndL,
 		opcodeOrL,
+		
+		opcodeMakeArr,
 		
 		opcodePrint,
 		
@@ -53,7 +56,7 @@ namespace SL {
 		size_t nOps;
 		Op *ops;
 		
-		size_t nParams, nVars;
+		size_t nParams, nLocals;
 		
 		static Func *create(Heap *heap);
 	};

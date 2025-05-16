@@ -47,8 +47,8 @@ namespace SL {
 		Func *run(Heap *heap, char const *file, size_t nChars, char const *chars);
 		
 	private:
-		// Record of a var or param
-		struct Local {
+		// Record of a local or param
+		struct Var {
 			// Offset on the stack relative to the function's
 			// base stack index
 			int32_t idx;
@@ -61,7 +61,7 @@ namespace SL {
 		// Record of a lexical scope
 		struct Scope {
 			size_t firstOp;
-			size_t firstActiveLocal;
+			size_t firstActiveVar;
 			bool isLoop;
 		};
 		
@@ -74,14 +74,14 @@ namespace SL {
 		
 		DArray<Val> consts;
 		DArray<Op> ops;
-		size_t nParams, nVars;
-		DArray<Local> activeLocals;
+		size_t nParams, nLocals;
+		DArray<Var> activeVars;
 		DArray<Scope> scopes;
 		DArray<size_t> breakOps;
 		
 		size_t getConst(Val val);
-		int32_t createVar(size_t nameNChars, char const *nameChars);
-		bool getLocal(size_t nameNChars, char const *nameChars, int32_t *oIdx);
+		int32_t createLocal(size_t nameNChars, char const *nameChars);
+		bool getVar(size_t nameNChars, char const *nameChars, int32_t *oIdx);
 		void enterScope(bool isLoop = false);
 		void exitScope();
 		

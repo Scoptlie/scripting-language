@@ -10,13 +10,14 @@ namespace SL {
 		typeNil,
 		typeNumber,
 		typeString,
-		//typeArray,
+		typeArray,
 		//typeStruct,
 		typeFunc,
 		typeThread,
 	};
 	
 	struct String;
+	struct Array;
 	struct Func;
 	struct Thread;
 	
@@ -26,6 +27,7 @@ namespace SL {
 			double numberVal;
 			void *ptrVal;
 			String *stringVal;
+			Array *arrayVal;
 			Func *funcVal;
 			Thread *threadVal;
 		};
@@ -40,6 +42,10 @@ namespace SL {
 		
 		bool isString() const {
 			return type == typeString;
+		}
+		
+		bool isArray() const {
+			return type == typeArray;
 		}
 		
 		bool isFunc() const {
@@ -72,6 +78,10 @@ namespace SL {
 		
 		static Val newString(String *val) {
 			return Val{.type = typeString, .stringVal = val};
+		}
+		
+		static Val newArray(Array *val) {
+			return Val{.type = typeArray, .arrayVal = val};
 		}
 		
 		static Val newFunc(Func *val) {
