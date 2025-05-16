@@ -1,0 +1,17 @@
+
+# Print every prime number between 2 and 97
+
+var i = 2, while i <= 97 {
+	var isPrime = true
+	var j = i - 1, while j >= 2 {
+		if i%j == 0 {
+			isPrime = false
+			break
+		}
+		j = j - 1
+	}
+	if isPrime {
+		print i
+	}
+	i = i + 1
+}

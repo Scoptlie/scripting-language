@@ -2,6 +2,7 @@
 *
 !*/
 
+!examples/**
 !source/**
 !.gitignore
 !build.py

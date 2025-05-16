@@ -1,4 +1,4 @@
-Toy scripting language being made for funsies. Very work in progress. Examples to come.
+Toy scripting language being made for funsies. Very work in progress.
 
 ## Building
 
