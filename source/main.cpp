@@ -1,48 +1,65 @@
 
 #include <cassert>
+#include <cstddef>
 #include <cstdio>
-#include <cstring>
 
-#include "parser.h"
+#include "sl/compiler.h"
+#include "sl/darray.h"
+#include "sl/heap.h"
+#include "sl/thread.h"
+#include "sl/val.h"
 
-char *loadStr(char const *file, size_t *oLen) {
+char *loadString(char const *file, size_t *oNChars) {
 	auto s = fopen(file, "rb");
-	assert(s);
+	if (!s) {
+		printf("cannot open file '%s' for reading", file);
+		return nullptr;
+	}
 	
 	fseek(s, 0, SEEK_END);
-	auto len = ftell(s);
+	auto nChars = ftell(s);
 	
-	auto r = new char[len + 1];
+	auto chars = new char[nChars + 1];
 	fseek(s, 0, SEEK_SET);
-	fread(r, 1, len, s);
-	r[len] = 0;
+	fread(chars, 1, nChars, s);
+	chars[nChars] = 0;
 	
-	*oLen = len;
-	return r;
+	*oNChars = nChars;
+	return chars;
 }
 
 int main(int argc, char **argv) {
-	if (argc == 1) {
+	using namespace SL;
+	
+	if (argc <= 1) {
 		puts("no inputs");
-		
 		return 1;
-	} else {
-		auto vm = Vm{};
-		vm.create();
+	}
+	
+	Heap heap;
+	heap.init();
+	
+	auto thread = Thread::create(&heap);
+	
+	for (auto i = 1; i < argc; i++) {
+		auto file = argv[i];
 		
-		for (auto i = 1; i < argc; i++) {
-			auto file = argv[i];
-			
-			size_t bufLen;
-			auto buf = loadStr(file, &bufLen);
-			auto f = Parser{}.run(file, bufLen + 1, buf);
-			delete[] buf;
-			
-			vm.call(f, 0, nullptr);
+		size_t nChars;
+		auto chars = loadString(file, &nChars);
+		if (!chars) {
+			return 1;
 		}
 		
-		vm.destroy();
+		auto func = Compiler{}.run(&heap, file, nChars + 1, chars);
+		if (!func) {
+			return 1;
+		}
 		
-		return 0;
+		Val result;
+		thread->call(func, 0, nullptr, &result);
 	}
+	
+	heap.deinit();
+	
+	return 0;
 }
