@@ -6,6 +6,7 @@
 #include "sl/compiler.h"
 #include "sl/darray.h"
 #include "sl/heap.h"
+#include "sl/struct.h"
 #include "sl/thread.h"
 #include "sl/val.h"
 
@@ -39,7 +40,9 @@ int main(int argc, char **argv) {
 	Heap heap;
 	heap.init();
 	
-	auto thread = Thread::create(&heap);
+	auto global = Val::newStruct(Struct::create(&heap, 16));
+	
+	auto thread = Thread::create(&heap, global);
 	
 	for (auto i = 1; i < argc; i++) {
 		auto file = argv[i];
@@ -56,7 +59,7 @@ int main(int argc, char **argv) {
 		}
 		
 		Val result;
-		thread->call(func, 0, nullptr, &result);
+		thread->call(func, global, 0, nullptr, &result);
 	}
 	
 	heap.deinit();

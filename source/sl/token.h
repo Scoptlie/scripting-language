@@ -21,6 +21,8 @@ namespace SL {
 		tokenKindKwTrue,
 		tokenKindKwFalse,
 		tokenKindKwFunc,
+		tokenKindKwThis,
+		tokenKindKwGlobal,
 		tokenKindKwPrint,
 		tokenKindKwVar,
 		tokenKindKwIf,

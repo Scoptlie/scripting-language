@@ -3,12 +3,14 @@
 #include "darray.h"
 #include "func.h"
 #include "heap.h"
+#include "val.h"
 
 namespace SL {
 	struct Call {
 		Func *func;
+		Val inst;
 		Op *opIt;
-		size_t nArgs;
+		size_t nInps, nArgs;
 		size_t baseStackIdx;
 	};
 	
@@ -16,17 +18,21 @@ namespace SL {
 	
 	struct Thread : public Object {
 		Heap *heap;
+		Val global;
 		
 		DArray<Val> stack;
 		DArray<Call> callStack;
 		
-		bool call(Func *func, size_t nArgs, Val const *args, Val *oResult);
+		bool call(Func *func, Val inst, size_t nArgs, Val const *args, Val *oResult);
 		
-		static Thread *create(Heap *heap);
+		static Thread *create(Heap *heap, Val global);
 		void deinit();
 		
 	private:
-		void call(Func *func, size_t nArgs);
+		Val getElem(Val base, Val subscript);
+		void setElem(Val base, Val subscript, Val val);
+		
+		void call(Func *func, Val inst, size_t nInps, size_t nArgs);
 		
 		bool runUntilReturnToHost(Val *oResult);
 		

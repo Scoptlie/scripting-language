@@ -110,6 +110,10 @@ namespace SL {
 			return Token{tokenKindKwFalse, line};
 		} else if (isKw("func")) {
 			return Token{tokenKindKwFunc, line};
+		} else if (isKw("this")) {
+			return Token{tokenKindKwThis, line};
+		} else if (isKw("global")) {
+			return Token{tokenKindKwGlobal, line};
 		} else if (isKw("print")) {
 			return Token{tokenKindKwPrint, line};
 		} else if (isKw("var")) {
@@ -576,32 +580,70 @@ namespace SL {
 			ops.push(Op{opcodeGetConst, int32_t(arg)});
 			
 			hasLhs = true;
+		} else if (nextToken.kind == tokenKindKwThis) {
+			eatToken();
+			
+			ops.push(Op{opcodeGetInst});
+			
+			hasLhs = true;
+		} else if (nextToken.kind == tokenKindKwGlobal) {
+			eatToken();
+			
+			ops.push(Op{opcodeGetGlobal});
+			
+			hasLhs = true;
 		} else if (nextToken.kind == tokenKindName) {
 			int32_t idx;
 			if (getVar(nextToken.strVal.nChars, nextToken.strVal.chars, &idx)) {
 				ops.push(Op{opcodeGetVar, idx});
 			} else {
-				printError(file, nextToken.line, "unresolved name '%.*s'",
-					int(nextToken.strVal.nChars),
-					nextToken.strVal.chars
-				);
-				throw 0;
+				ops.push(Op{opcodeGetInst});
+				
+				auto key = String::create(heap, nextToken.strVal.nChars, nextToken.strVal.chars);
+				auto arg = getConst(Val::newString(key));
+				ops.push(Op{opcodeGetConst, int32_t(arg)});
+				
+				ops.push(Op{opcodeGetElem});
 			}
 			
 			eatToken();
+			
+			hasLhs = true;
+		} else if (nextToken.kind == '@') {
+			eatToken();
+			
+			auto nameToken = expectToken(tokenKindName, "name");
+			
+			ops.push(Op{opcodeGetGlobal});
+			
+			auto key = String::create(heap, nameToken.strVal.nChars, nameToken.strVal.chars);
+			auto arg = getConst(Val::newString(key));
+			ops.push(Op{opcodeGetConst, int32_t(arg)});
+			
+			ops.push(Op{opcodeGetElem});
 			
 			hasLhs = true;
 		}
 		
 		for (;;) {
 			if (hasLhs && nextToken.kind == '(') {
+				auto instCall = false;
+				if (ops.buf[ops.len - 1].opcode == opcodeGetElem) {
+					ops.len--;
+					instCall = true;
+				}
+				
 				eatToken();
 				
 				auto nArgs = eatExprList();
 				
 				expectToken(TokenKind(')'), "')'");
 				
-				ops.push(Op{opcodeCall, int32_t(nArgs)});
+				if (instCall) {
+					ops.push(Op{opcodeInstCall, int32_t(nArgs)});
+				} else {
+					ops.push(Op{opcodeCall, int32_t(nArgs)});
+				}
 			} else if (hasLhs && nextToken.kind == '[') {
 				eatToken();
 				

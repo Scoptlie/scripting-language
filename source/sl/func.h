@@ -7,6 +7,8 @@
 
 namespace SL {
 	enum Opcode : uint8_t {
+		opcodeGetInst,
+		opcodeGetGlobal,
 		opcodeGetConst,
 		opcodeGetVar,
 		opcodeSetVar,
@@ -41,6 +43,7 @@ namespace SL {
 		opcodeJmpN,
 		
 		opcodeCall,
+		opcodeInstCall,
 		opcodeRet,
 	};
 	

@@ -29,9 +29,10 @@ namespace SL {
 			"name",
 			
 			"'nil'", "'true'", "'false'",
-			"'func'", "'print'", "'var'",
-			"'if'", "'else'", "'while'",
-			"'break'", "'continue'", "'return'",
+			"'func'", "'this'", "'global'",
+			"'print'", "'var'", "'if'",
+			"'else'", "'while'", "'break'",
+			"'continue'", "'return'",
 			
 			"'=='", "'!='", "'&&'",
 			"'||'", "'<='", "'>='",
