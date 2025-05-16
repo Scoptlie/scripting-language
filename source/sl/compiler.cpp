@@ -290,6 +290,56 @@ namespace SL {
 		eolIsWs = true;
 	}
 	
+	String *Compiler::createStringFromToken(Token token) {
+		auto tokenVal = nextToken.strVal;
+		
+		String *r;
+		if (tokenVal.nChars > 0) {
+			DArray<char> chars;
+			chars.init(tokenVal.nChars);
+			
+			auto i = size_t(0);
+			while (i < tokenVal.nChars) {
+				auto c = tokenVal.chars[i++];
+				if (c == '\\') {
+					// Okay not to do a bounds check here because
+					// '\' will never be the last character in a string constant
+					c = tokenVal.chars[i++];
+					if (c == '"') {
+						chars.push('"');
+					} else if (c == '\\') {
+						chars.push('\\');
+					} else if (c == 'n') {
+						chars.push('\n');
+					} else if (c == 't') {
+						chars.push('\t');
+					} else if (c == 'f') {
+						chars.push('\f');
+					} else if (c == 'r') {
+						chars.push('\r');
+					} else if (c == 'b') {
+						chars.push('\b');
+					} else {
+						chars.deinit();
+						
+						printError(file, nextToken.line, "invalid escape sequence");
+						throw 0;
+					}
+				} else {
+					chars.push(c);
+				}
+			}
+			
+			r = String::create(heap, chars.len, chars.buf);
+			
+			chars.deinit();
+		} else {
+			r = String::create(heap, 0, nullptr);
+		}
+		
+		return r;
+	}
+	
 	size_t Compiler::getConst(Val val) {
 		for (auto i = size_t(0); i < consts.len; i++) {
 			if (consts.buf[i].equals(val)) {
@@ -408,59 +458,11 @@ namespace SL {
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindString) {
-			auto tokenVal = nextToken.strVal;
+			auto arg = getConst(Val::newString(
+				createStringFromToken(nextToken)
+			));
+			eatToken();
 			
-			Val val;
-			if (tokenVal.nChars > 0) {
-				DArray<char> chars;
-				chars.init(tokenVal.nChars);
-				
-				auto i = size_t(0);
-				while (i < tokenVal.nChars) {
-					auto c = tokenVal.chars[i++];
-					if (c == '\\') {
-						// Okay not to do a bounds check here because
-						// '\' will never be the last character in a string constant
-						c = tokenVal.chars[i++];
-						if (c == '"') {
-							chars.push('"');
-						} else if (c == '\\') {
-							chars.push('\\');
-						} else if (c == 'n') {
-							chars.push('\n');
-						} else if (c == 't') {
-							chars.push('\t');
-						} else if (c == 'f') {
-							chars.push('\f');
-						} else if (c == 'r') {
-							chars.push('\r');
-						} else if (c == 'b') {
-							chars.push('\b');
-						} else {
-							chars.deinit();
-							
-							printError(file, nextToken.line, "invalid escape sequence");
-							throw 0;
-						}
-					} else {
-						chars.push(c);
-					}
-				}
-				
-				eatToken();
-				
-				val = Val::newString(
-					String::create(heap, chars.len, chars.buf)
-				);
-				
-				chars.deinit();
-			} else {
-				val = Val::newString(
-					String::create(heap, 0, nullptr)
-				);
-			}
-			
-			auto arg = getConst(val);
 			ops.push(Op{opcodeGetConst, int32_t(arg)});
 			
 			hasLhs = true;
@@ -471,7 +473,43 @@ namespace SL {
 			
 			expectToken(TokenKind(']'), "']'");
 			
-			ops.push(Op{opcodeMakeArr, int32_t(nElems)});
+			ops.push(Op{opcodeMakeArray, int32_t(nElems)});
+			
+			hasLhs = true;
+		} else if (nextToken.kind == '{') {
+			eatToken();
+			
+			auto nElems = size_t(0);
+			
+			while (nextToken.kind == tokenKindString ||
+				nextToken.kind == tokenKindName
+			) {
+				nElems++;
+				
+				String *key;
+				if (nextToken.kind == tokenKindString) {
+					key = createStringFromToken(nextToken);
+				} else {
+					key = String::create(heap, nextToken.strVal.nChars, nextToken.strVal.chars);
+				}
+				
+				eatToken();
+				
+				auto arg = getConst(Val::newString(key));
+				ops.push(Op{opcodeGetConst, int32_t(arg)});
+				
+				expectToken(TokenKind('='), "'='");
+				
+				expectExpr();
+				
+				if (!eatSepToken()) {
+					break;
+				}
+			}
+			
+			expectToken(TokenKind('}'), "'}'");
+			
+			ops.push(Op{opcodeMakeStruct, int32_t(nElems)});
 			
 			hasLhs = true;
 		} else if (nextToken.kind == tokenKindKwFunc) {
@@ -570,6 +608,16 @@ namespace SL {
 				expectExpr();
 				
 				expectToken(TokenKind(']'), "']'");
+				
+				ops.push(Op{opcodeGetElem});
+			} else if (hasLhs && nextToken.kind == '.') {
+				eatToken();
+				
+				auto nameToken = expectToken(tokenKindName, "name");
+				
+				auto key = String::create(heap, nameToken.strVal.nChars, nameToken.strVal.chars);
+				auto arg = getConst(Val::newString(key));
+				ops.push(Op{opcodeGetConst, int32_t(arg)});
 				
 				ops.push(Op{opcodeGetElem});
 			} else {

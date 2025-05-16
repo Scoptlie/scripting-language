@@ -79,6 +79,8 @@ namespace SL {
 		DArray<Scope> scopes;
 		DArray<size_t> breakOps;
 		
+		String *createStringFromToken(Token token);
+		
 		size_t getConst(Val val);
 		int32_t createLocal(size_t nameNChars, char const *nameChars);
 		bool getVar(size_t nameNChars, char const *nameChars, int32_t *oIdx);

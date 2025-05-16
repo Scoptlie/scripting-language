@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include <cstddef>
+#include <cstdint>
 
 #include "heap.h"
 
@@ -11,13 +12,14 @@ namespace SL {
 		typeNumber,
 		typeString,
 		typeArray,
-		//typeStruct,
+		typeStruct,
 		typeFunc,
 		typeThread,
 	};
 	
 	struct String;
 	struct Array;
+	struct Struct;
 	struct Func;
 	struct Thread;
 	
@@ -28,6 +30,7 @@ namespace SL {
 			void *ptrVal;
 			String *stringVal;
 			Array *arrayVal;
+			Struct *structVal;
 			Func *funcVal;
 			Thread *threadVal;
 		};
@@ -46,6 +49,10 @@ namespace SL {
 		
 		bool isArray() const {
 			return type == typeArray;
+		}
+		
+		bool isStruct() const {
+			return type == typeStruct;
 		}
 		
 		bool isFunc() const {
@@ -84,6 +91,10 @@ namespace SL {
 			return Val{.type = typeArray, .arrayVal = val};
 		}
 		
+		static Val newStruct(Struct *val) {
+			return Val{.type = typeStruct, .structVal = val};
+		}
+		
 		static Val newFunc(Func *val) {
 			return Val{.type = typeFunc, .funcVal = val};
 		}
@@ -100,6 +111,10 @@ namespace SL {
 	struct String : public Object {
 		size_t nChars;
 		char chars[1];
+		
+		uint32_t hash();
+		
+		bool isEqual(String *other);
 		
 		static String *create(Heap *heap, size_t nChars);
 		static String *create(Heap *heap, size_t nChars, char const *chars);

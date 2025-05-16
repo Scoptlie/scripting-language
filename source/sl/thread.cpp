@@ -5,6 +5,7 @@
 #include <cstdio>
 
 #include "array.h"
+#include "struct.h"
 #include "val.h"
 
 namespace SL {
@@ -98,6 +99,14 @@ namespace SL {
 							break;
 						}
 					}
+				} else if (base.isStruct()) {
+					auto key = String::createFromVal(heap, subscript);
+					Val v;
+					if (base.structVal->get(key, &v)) {
+						stack.push(v);
+						
+						break;
+					}
 				}
 				
 				stack.push(Val::newNil());
@@ -124,6 +133,15 @@ namespace SL {
 							break;
 						}
 					}
+				} else if (base.isStruct()) {
+					auto key = String::createFromVal(heap, subscript);
+					if (v.isNil()) {
+						base.structVal->remove(key);
+					} else {
+						base.structVal->set(key, v);
+					}
+					
+					break;
 				}
 				
 				break;
@@ -258,7 +276,7 @@ namespace SL {
 				stack.push(Val::fromBool(a.asBool() || b.asBool()));
 				break;
 			}
-			case opcodeMakeArr: {
+			case opcodeMakeArray: {
 				auto nElems = op.arg;
 				assert(stack.len >= nElems);
 				
@@ -267,6 +285,23 @@ namespace SL {
 				stack.len -= nElems;
 				
 				stack.push(Val::newArray(r));
+				
+				break;
+			}
+			case opcodeMakeStruct: {
+				auto nElems = op.arg;
+				assert(stack.len >= nElems * 2);
+				
+				auto r = Struct::create(heap, 16);
+				
+				for (auto i = size_t(0); i < nElems; i++) {
+					auto v = stack.pop();
+					auto key = stack.pop();
+					
+					r->set(String::createFromVal(heap, key), v);
+				}
+				
+				stack.push(Val::newStruct(r));
 				
 				break;
 			}

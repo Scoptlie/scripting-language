@@ -14,16 +14,33 @@ namespace SL {
 			} else if (type == typeNumber) {
 				return numberVal == other.numberVal;
 			} else if (type == typeString) {
-				return stringVal == other.stringVal || (
-					stringVal->nChars == other.stringVal->nChars &&
-					memcmp(stringVal->chars, other.stringVal->chars, stringVal->nChars) == 0
-				);
+				return stringVal->isEqual(other.stringVal);
 			} else {
 				return ptrVal == other.ptrVal;
 			}
 		} else {
 			return false;
 		}
+	}
+	
+	uint32_t String::hash() {
+		auto r = uint32_t(nChars);
+		for (auto i = size_t(0); i < nChars; i++) {
+			r ^= ((r << 5) + (r >> 2) + uint32_t(chars[i]));
+		}
+		return r * 2654435769u;
+	}
+	
+	bool String::isEqual(String *other) {
+		if (this == other) {
+			return true;
+		}
+		
+		if (nChars != other->nChars) {
+			return false;
+		}
+		
+		return memcmp(chars, other->chars, nChars) == 0;
 	}
 	
 	String *String::create(Heap *heap, size_t nChars) {
@@ -56,6 +73,9 @@ namespace SL {
 			return val.stringVal;
 		} else if (val.isArray()) {
 			auto len = snprintf(buf, sizeof(buf), "array@%p", val.arrayVal);
+			return create(heap, (len >= 0)? len : 0, buf);
+		} else if (val.isStruct()) {
+			auto len = snprintf(buf, sizeof(buf), "struct@%p", val.structVal);
 			return create(heap, (len >= 0)? len : 0, buf);
 		} else if (val.isFunc()) {
 			auto len = snprintf(buf, sizeof(buf), "func@%p", val.funcVal);

@@ -32,7 +32,8 @@ namespace SL {
 		opcodeAndL,
 		opcodeOrL,
 		
-		opcodeMakeArr,
+		opcodeMakeArray,
+		opcodeMakeStruct,
 		
 		opcodePrint,
 		
