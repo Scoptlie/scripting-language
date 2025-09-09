@@ -169,6 +169,9 @@ else:
 		'-O3',
 		'-flto'
 	]
+	linker_args += [
+		'-flto'
+	]
 
 if platform.system() == 'Windows':
 	scri_file = 'gen/scri.exe'
@@ -177,7 +180,7 @@ else:
 
 compile_commands = []
 
-gen_bin_file(scri_file, ['source', 'thirdparty/source'])
+gen_bin_file(scri_file, ['source'])
 
 with open('gen/compile_commands.json', 'w') as s:
 	json.dump(compile_commands, s)

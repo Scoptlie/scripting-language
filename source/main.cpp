@@ -4,7 +4,6 @@
 #include <cstdio>
 
 #include "sl/compiler.h"
-#include "sl/darray.h"
 #include "sl/heap.h"
 #include "sl/struct.h"
 #include "sl/thread.h"
