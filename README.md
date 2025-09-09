@@ -1,4 +1,6 @@
-Toy scripting language being made for funsies. Very work in progress.
+Unnamed toy scripting language being made for funsies. Very work in progress.
+
+Warning! There is no garbage collector, meaning scripts use more memory the longer they run.
 
 ## Building
 
@@ -27,3 +29,5 @@ The command line interface is:
 ```
 scri [input file(s)]
 ```
+
+See the [examples](./examples) for guidance on the syntax and language features.

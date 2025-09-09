@@ -48,7 +48,7 @@ namespace SL {
 			auto array = base.arrayVal;
 			auto idxF = subscript.numberVal;
 			
-			if (idxF == trunc(idxF) && !isnan(idxF) && !isinf(idxF)) {
+			if (idxF == trunc(idxF) && !std::isnan(idxF) && !std::isinf(idxF)) {
 				auto idx = ptrdiff_t(idxF);
 				
 				if (idx >= 0 && idx < array->nElems) {
@@ -71,7 +71,7 @@ namespace SL {
 			auto array = base.arrayVal;
 			auto idxF = subscript.numberVal;
 			
-			if (idxF == trunc(idxF) && !isnan(idxF) && !isinf(idxF)) {
+			if (idxF == trunc(idxF) && !std::isnan(idxF) && !std::isinf(idxF)) {
 				auto idx = ptrdiff_t(idxF);
 				
 				if (idx >= 0 && idx < array->nElems) {
